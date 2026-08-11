@@ -1,0 +1,8 @@
+{
+  "name": "Remix  Termux SSH PTY v2 pro",
+  "description": "Minimal browser-based SSH PTY terminal for Termux. Fast, secure, and built specifically for Android users.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
