@@ -1,5 +1,6 @@
 import { LitElement, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { computePosition, flip, shift, offset } from '@floating-ui/dom';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
@@ -124,6 +125,13 @@ export class PtyApp extends LitElement {
   @state() ctrlActive: boolean = false;
   @state() altActive: boolean = false;
   @state() toolbarVisible: boolean = true;
+  @state() palettePopupActive: boolean = false;
+  @state() paletteSearchValue: string = '';
+  @state() tooltipVisible: boolean = false;
+  @state() tooltipText: string = '';
+  @state() tooltipX: number = 0;
+  @state() tooltipY: number = 0;
+  private tooltipTimer: any = null;
   private toolbarHideTimer: any;
 
   private term!: Terminal;
@@ -261,6 +269,18 @@ export class PtyApp extends LitElement {
     
     this.initSwipeGestures();
     this.initBatteryIndicator();
+
+    window.addEventListener('click', (e) => {
+      if (this.palettePopupActive) {
+        const path = e.composedPath();
+        const popup = this.shadowRoot?.querySelector('#toolbar-popup');
+        const menuBtn = this.shadowRoot?.querySelector('#menu-btn');
+        if (popup && !path.includes(popup) && menuBtn && !path.includes(menuBtn)) {
+          this.palettePopupActive = false;
+          this.paletteSearchValue = '';
+        }
+      }
+    });
 
     // Turn off loading states after 1s
     setTimeout(() => {
@@ -1447,6 +1467,136 @@ export class PtyApp extends LitElement {
     }, 5000);
   }
 
+  getPaletteCommands() {
+    const baseCommands = [
+      { label: 'Command Palette', shortcut: 'Ctrl+Shift+P', desc: 'Opens the command search menu to quickly find and run actions.', action: () => this.toggleCommandPalette() },
+      { label: 'Settings', shortcut: 'Ctrl+,', desc: 'Configure terminal themes, macros, and connection preferences.', action: () => this.setView('setup') },
+      { label: 'Toggle Terminal', shortcut: 'Ctrl+`', desc: 'Switch visibility of the main terminal buffer.', action: () => this.setView('terminal') },
+      { label: 'Documentation', shortcut: '', desc: 'View the user manual and keyboard shortcut guide.', action: () => this.setView('documentation') },
+      { label: 'File Explorer', shortcut: 'Ctrl+Shift+E', desc: 'Browse and manage files in the current workspace.', action: () => {} },
+      { label: 'Source Control', shortcut: 'Ctrl+Shift+G', desc: 'Manage git repositories and track changes.', action: () => {} },
+      { label: 'Run and Debug', shortcut: 'Ctrl+Shift+D', desc: 'Launch and debug applications in the terminal.', action: () => {} },
+      { label: 'Clear Console (Ctrl+L)', shortcut: '', desc: 'Clears the current terminal display buffer.', action: () => this.sendSpecial('CTRL_L') },
+      { label: 'Interrupt Process (Ctrl+C)', shortcut: '', desc: 'Sends SIGINT to the active process to stop it.', action: () => this.sendSpecial('CTRL_C') },
+      
+      // Relocated from top toolbar
+      { label: 'Copy Terminal Buffer', shortcut: '', desc: 'Copies the entire scrollback history to clipboard.', action: () => this.copyTerminalText() },
+      { label: 'Paste from Clipboard', shortcut: '', desc: 'Inserts text from your device clipboard into terminal.', action: () => this.pasteTerminalText() },
+      { label: 'Decrease Font Size', shortcut: 'Alt+-', desc: 'Makes the terminal text smaller for more density.', action: () => this.adjustFontSize(-1) },
+      { label: 'Increase Font Size', shortcut: 'Alt++', desc: 'Makes the terminal text larger for better readability.', action: () => this.adjustFontSize(1) },
+      { label: 'Refit Layout', shortcut: '', desc: 'Recalculates terminal dimensions to fit window exactly.', action: () => this.triggerManualResize() },
+      { label: 'Toggle Fullscreen', shortcut: '', desc: 'Enables immersive mode to hide browser address bars.', action: () => this.toggleImmersive() },
+      { label: 'Find in Terminal', shortcut: 'Ctrl+F', desc: 'Search for text patterns within the terminal buffer.', action: () => this.openSearch() },
+      { label: 'Download Logs', shortcut: '', desc: 'Saves current session output as a .txt file.', action: () => this.downloadLogs() },
+      { label: 'Send Escape Key', shortcut: '', desc: 'Sends the physical ESC key sequence to the host.', action: () => this.sendCmd('\x1b') },
+      { label: 'Send Tab Key', shortcut: '', desc: 'Sends a TAB character for command completion.', action: () => this.sendCmd('\t') },
+      { label: 'Show System Information', shortcut: '', desc: 'Displays server kernel version and uptime info.', action: () => this.sendCmd('uname -a && uptime\r') },
+      { label: 'Exit Session', shortcut: '', desc: 'Closes the current SSH connection and logs out.', action: () => this.disconnectSession() },
+    ];
+
+    const macroCommands = this.macros.map(m => ({
+      label: `Macro: ${m.name}`,
+      shortcut: '',
+      desc: `Executes pre-defined command: ${m.command}`,
+      action: () => this.runMacro(m.command)
+    }));
+
+    return [...baseCommands, ...macroCommands];
+  }
+
+  togglePalette() {
+    this.palettePopupActive = !this.palettePopupActive;
+    this.tooltipVisible = false;
+    if (this.palettePopupActive) {
+      setTimeout(() => {
+        const input = this.shadowRoot?.querySelector('#palette-search') as HTMLInputElement;
+        input?.focus();
+      }, 50);
+    } else {
+      this.paletteSearchValue = '';
+    }
+  }
+
+  onPaletteSearchInput(e: Event) {
+    const target = e.target as HTMLInputElement;
+    this.paletteSearchValue = target.value;
+  }
+
+  getFilteredPaletteCommands() {
+    const filter = this.paletteSearchValue.toLowerCase();
+    return this.getPaletteCommands().filter(cmd => 
+      cmd.label.toLowerCase().includes(filter) || 
+      cmd.shortcut.toLowerCase().includes(filter)
+    );
+  }
+
+  handlePaletteCommand(action: Function) {
+    action();
+    this.palettePopupActive = false;
+    this.paletteSearchValue = '';
+    this.handleItemPointerUp();
+  }
+
+  isAndroid() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+  }
+
+  handleItemPointerDown(e: PointerEvent, label: string, desc: string) {
+    if (this.tooltipTimer) clearTimeout(this.tooltipTimer);
+    
+    // Capture necessary context before the timeout
+    const target = e.currentTarget as HTMLElement;
+    const fallbackX = e.clientX;
+    const fallbackY = e.clientY - 60;
+
+    this.tooltipTimer = setTimeout(async () => {
+      this.tooltipText = desc || `Command: ${label}. Tap to execute or click × to dismiss.`;
+      
+      // Start with a reasonable fallback position near the touch point
+      // to avoid the "off-screen" flash if positioning takes a moment
+      this.tooltipX = Math.max(10, Math.min(fallbackX - 100, window.innerWidth - 250));
+      this.tooltipY = Math.max(10, fallbackY);
+      
+      this.tooltipVisible = true;
+      
+      // Wait for rendering to complete so we can measure the tooltip
+      await this.updateComplete;
+      
+      const tooltip = this.shadowRoot?.querySelector('.vscode-tooltip') as HTMLElement;
+      if (tooltip && target) {
+        try {
+          const {x, y} = await computePosition(target, tooltip, {
+            placement: 'top',
+            strategy: 'fixed',
+            middleware: [
+              offset(12),
+              flip(),
+              shift({padding: 10})
+            ],
+          });
+          
+          this.tooltipX = x;
+          this.tooltipY = y;
+          this.requestUpdate();
+        } catch (err) {
+          console.warn('Floating UI failed, using fallback:', err);
+        }
+      }
+    }, 900);
+  }
+
+  handleItemPointerUp() {
+    if (this.tooltipTimer) clearTimeout(this.tooltipTimer);
+    if (!this.isAndroid()) {
+      this.tooltipVisible = false;
+    }
+  }
+
+  closeTooltip(e: Event) {
+    e.stopPropagation();
+    this.tooltipVisible = false;
+  }
+
   sendSpecial(key: string) {
     const keys: Record<string, string> = {
       'CTRL_C': '\x03',
@@ -2106,40 +2256,6 @@ export class PtyApp extends LitElement {
 
       <!-- Terminal View -->
       <div id="terminal-view" class="view ${this.activeTab === 'terminal' ? 'active' : ''}">
-        <div class="terminal-toolbar">
-          <span class="codicon codicon-terminal" style="margin-right: 8px; color: var(--text-dim, #969696);"></span>
-          <button class="toolbar-btn" @click="${this.toggleCommandPalette}" title="Command Palette"><span class="codicon codicon-list-flat"></span></button>
-          <button class="toolbar-btn" @click="${this.copyTerminalText}" title="Copy entire buffer"><span class="codicon codicon-copy"></span></button>
-          <button class="toolbar-btn" @click="${this.pasteTerminalText}" title="Paste from clipboard"><span class="codicon codicon-paste"></span></button>
-          
-          <div class="toolbar-separator"></div>
-
-          <button class="toolbar-btn" @click="${() => this.adjustFontSize(-1)}" title="Decrease font size"><span class="codicon codicon-zoom-out"></span></button>
-          <button class="toolbar-btn" @click="${() => this.adjustFontSize(1)}" title="Increase font size"><span class="codicon codicon-zoom-in"></span></button>
-          
-          <div class="toolbar-separator"></div>
-
-          <button class="toolbar-btn" @click="${this.triggerManualResize}" title="Force layout refit"><span class="codicon codicon-refresh"></span></button>
-          <button class="toolbar-btn" @click="${this.toggleImmersive}" title="Toggle fullscreen immersive mode"><span class="codicon codicon-screen-full"></span></button>
-          <button class="toolbar-btn" @click="${this.openSearch}" title="Search in terminal"><span class="codicon codicon-search"></span></button>
-          <button class="toolbar-btn" @click="${this.downloadLogs}" title="Download Terminal Logs as TXT"><span class="codicon codicon-cloud-download"></span></button>
-
-          <div class="toolbar-separator"></div>
-
-          <button class="toolbar-btn" @click="${() => this.sendSpecial('CTRL_C')}" title="Interrupt Current Process (Ctrl+C)"><span class="codicon codicon-debug-stop"></span></button>
-          <button class="toolbar-btn" @click="${() => this.sendSpecial('CTRL_L')}" title="Clear Console (Ctrl+L)"><span class="codicon codicon-clear-all"></span></button>
-          <button class="toolbar-btn" @click="${() => this.sendCmd('\x1b')}" title="Send Escape Key"><span class="codicon codicon-debug-step-out"></span></button>
-          <button class="toolbar-btn" @click="${() => this.sendCmd('\t')}" title="Send Tab Key"><span class="codicon codicon-arrow-both"></span></button>
-          <button class="toolbar-btn" @click="${() => this.sendCmd('uname -a && uptime\r')}" title="Show System Information"><span class="codicon codicon-info"></span></button>
-
-          ${this.macros.map(m => html`
-            <button class="toolbar-btn" @click="${() => this.runMacro(m.command)}" title="Run Macro: ${m.command}"><span class="codicon codicon-play"></span> ${m.name}</button>
-          `)}
-
-          <button class="toolbar-btn danger" style="margin-left: auto" @click="${this.disconnectSession}" title="Exit Session">
-            <span class="codicon codicon-sign-out"></span>
-          </button>
-        </div>
         <div id="terminal-container" class="${this.getAnimationClass()} ${this.isLoading.terminal ? 'skeleton' : ''}">
           <div id="search-bar" class="${this.searchActive ? 'active' : ''}">
             <div class="drag-handle" id="search-drag-handle" title="Drag to move">⋮⋮</div>
@@ -2169,23 +2285,52 @@ export class PtyApp extends LitElement {
           ` : ''}
         </div>
         
-        <div class="termux-toolbar" style="display: ${this.toolbarVisible ? 'flex' : 'none'}">
-          <button class="toolbar-toggle-btn" @click="${() => this.toolbarVisible = !this.toolbarVisible}">
-            <span class="codicon codicon-chevron-down" style="font-size: 16px;"></span>
-          </button>
-          <button class="t-btn" @click="${() => this.sendToolbarKey('ESC')}">ESC</button>
-          <button class="t-btn" @click="${() => this.sendToolbarKey('TAB')}">TAB</button>
-          <button class="t-btn ${this.ctrlActive ? 'active' : ''}" @click="${() => this.ctrlActive = !this.ctrlActive}">CTRL</button>
-          <button class="t-btn ${this.altActive ? 'active' : ''}" @click="${() => this.altActive = !this.altActive}">ALT</button>
-          <button class="t-btn" @click="${() => this.sendToolbarKey('/')}">/</button>
-          <button class="t-btn" @click="${() => this.sendToolbarKey('-')}">-</button>
-          <button class="t-btn" @click="${() => this.sendToolbarKey('|')}">|</button>
-          <button class="t-btn" @click="${() => this.sendToolbarKey('HOME')}">HOME</button>
-          <button class="t-btn" @click="${() => this.sendToolbarKey('UP')}">↑</button>
-          <button class="t-btn" @click="${() => this.sendToolbarKey('END')}">END</button>
-          <button class="t-btn" @click="${() => this.sendToolbarKey('LEFT')}">←</button>
-          <button class="t-btn" @click="${() => this.sendToolbarKey('DOWN')}">↓</button>
-          <button class="t-btn" @click="${() => this.sendToolbarKey('RIGHT')}">→</button>
+        <button class="toolbar-toggle-btn" @click="${() => this.toolbarVisible = !this.toolbarVisible}" title="${this.toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}">
+          <span class="material-symbols-rounded">
+            ${this.toolbarVisible ? 'keyboard_arrow_down' : 'keyboard_arrow_up'}
+          </span>
+        </button>
+
+        <div class="vs-toolbar" style="display: ${this.toolbarVisible ? 'flex' : 'none'}">
+          <!-- Popup Menu with Filterable Search & Shortcuts -->
+          <div id="toolbar-popup" class="toolbar-popup ${this.palettePopupActive ? 'show' : ''}">
+            <div class="popup-search-box">
+              <input type="text" id="palette-search" class="popup-search-input" placeholder="Search commands..." autocomplete="off" .value="${this.paletteSearchValue}" @input="${this.onPaletteSearchInput}">
+            </div>
+            <div class="popup-items-list" id="popup-list">
+              ${this.getFilteredPaletteCommands().map(cmd => html`
+                <div class="popup-item" 
+                  @click="${() => this.handlePaletteCommand(cmd.action)}"
+                  @pointerdown="${(e: PointerEvent) => this.handleItemPointerDown(e, cmd.label, (cmd as any).desc || '')}"
+                  @pointerup="${this.handleItemPointerUp}">
+                  <span class="popup-label">${cmd.label}</span>
+                  <span class="popup-shortcut">${cmd.shortcut}</span>
+                </div>
+              `)}
+            </div>
+          </div>
+
+          <!-- Row 1 -->
+          <div class="toolbar-row">
+            <button class="key" @click="${() => this.sendToolbarKey('ESC')}">ESC</button>
+            <button class="key" id="menu-btn" @click="${this.togglePalette}"><i class="fa-solid fa-bars"></i></button>
+            <button class="key" @click="${() => this.toolbarVisible = !this.toolbarVisible}"><i class="fa-solid fa-arrows-up-down"></i></button>
+            <button class="key" @click="${() => this.sendToolbarKey('HOME')}">HOME</button>
+            <button class="key" @click="${() => this.sendToolbarKey('UP')}"><i class="fa-solid fa-arrow-up"></i></button>
+            <button class="key" @click="${() => this.sendToolbarKey('END')}">END</button>
+            <button class="key" @click="${() => this.sendCmd('\x1b[5~')}">PGUP</button>
+          </div>
+
+          <!-- Row 2 -->
+          <div class="toolbar-row">
+            <button class="key" @click="${() => this.sendToolbarKey('TAB')}"><i class="fa-solid fa-indent"></i></button>
+            <button class="key ${this.ctrlActive ? 'active' : ''}" @click="${() => this.ctrlActive = !this.ctrlActive}">CTRL</button>
+            <button class="key ${this.altActive ? 'active' : ''}" @click="${() => this.altActive = !this.altActive}">ALT</button>
+            <button class="key" @click="${() => this.sendToolbarKey('LEFT')}"><i class="fa-solid fa-arrow-left"></i></button>
+            <button class="key" @click="${() => this.sendToolbarKey('DOWN')}"><i class="fa-solid fa-arrow-down"></i></button>
+            <button class="key" @click="${() => this.sendToolbarKey('RIGHT')}"><i class="fa-solid fa-arrow-right"></i></button>
+            <button class="key" @click="${() => this.sendCmd('\x1b[6~')}">PGDN</button>
+          </div>
         </div>
         
         <div class="toolbar-toggle-floating" style="display: ${this.toolbarVisible ? 'none' : 'flex'}">
@@ -2245,6 +2390,17 @@ export class PtyApp extends LitElement {
               ${c.id === 'settings' ? html`<li class="palette-divider"></li>` : ''}
             `)}
             </ul>
+          </div>
+        </div>
+      ` : ''}
+
+      ${this.tooltipVisible ? html`
+        <div class="vscode-tooltip" style="left: ${this.tooltipX}px; top: ${this.tooltipY}px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>${this.tooltipText}</span>
+            ${this.isAndroid() ? html`
+              <button @click="${this.closeTooltip}" style="background: none; border: none; color: #fff; cursor: pointer; padding: 2px 4px; font-size: 14px; border-left: 1px solid #454545; margin-left: 4px;">✕</button>
+            ` : ''}
           </div>
         </div>
       ` : ''}

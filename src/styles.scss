@@ -821,60 +821,6 @@ body, html {
 }
 
 /* Terminal View Components */
-.terminal-toolbar {
-  height: 30px;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 4px;
-  gap: 2px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  
-  &::-webkit-scrollbar {
-    display: none;
-  }
-}
-
-.toolbar-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-normal);
-  font-size: 10px;
-  font-family: var(--font-code, monospace);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border-radius: 0;
-  transition: all 0.1s;
-  flex-shrink: 0;
-  white-space: nowrap;
-  
-  &:hover {
-    color: var(--text-bright);
-    background: var(--input-bg);
-    border-color: var(--border);
-  }
-  
-  &.danger:hover {
-    color: #ffffff;
-    background: #e51400;
-    border-color: #f7311d;
-  }
-}
-
-.toolbar-separator {
-  width: 1px;
-  height: 14px;
-  background: var(--border);
-  margin: 0 4px;
-  flex-shrink: 0;
-}
-
 .custom-select {
   position: relative;
   width: 100%;
@@ -1557,11 +1503,236 @@ input[type=range]::-webkit-slider-thumb:hover {
   font-size: 13px;
   color: var(--text-normal, #cccccc);
 }
-.shortcut-item input {
-  width: 100px;
-  padding: 4px;
-  border: 1px solid var(--border, #3d3d40);
-  background: var(--bg-main, #1e1e1e);
-  color: var(--text-normal, #cccccc);
-  border-radius: 4px;
+
+/* VS Code Toolbar Styles */
+:root {
+  --vscode-bg: #181818;
+  --vscode-text: #cccccc;
+  --vscode-active: #ffffff;
 }
+
+.vs-toolbar {
+  position: relative;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background-color: var(--vscode-bg);
+  padding: 3px 4px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 0;
+  border-top: 1px solid #2d2d2d;
+  z-index: 1000;
+}
+
+.toolbar-toggle-btn {
+  background-color: var(--vscode-bg);
+  color: var(--vscode-text);
+  border: 1px solid #2d2d2d;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  width: 40px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  margin-right: 12px;
+  cursor: pointer;
+  z-index: 1001;
+  outline: none;
+  padding: 0;
+  transition: background-color 0.1s ease;
+  
+  &:active {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  span {
+    font-size: 18px;
+    line-height: 1;
+  }
+}
+
+.toolbar-popup {
+  display: flex;
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 4px;
+  width: calc(100vw - 8px);
+  max-width: 320px;
+  background-color: #252526;
+  border: 1px solid #3c3c3c;
+  border-radius: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  padding: 0;
+  z-index: 1001;
+  flex-direction: column;
+  box-sizing: border-box;
+  
+  opacity: 0;
+  transform: translateY(6px);
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+
+  &.show {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+    pointer-events: auto;
+  }
+}
+
+.popup-search-box {
+  padding: 6px 8px;
+  border-bottom: 1px solid #333333;
+  background-color: #1f1f1f;
+  box-sizing: border-box;
+}
+
+.popup-search-input {
+  width: 100%;
+  background-color: #1e1e1e !important;
+  border: 1px solid #3c3c3c !important;
+  color: var(--vscode-text) !important;
+  padding: 5px 8px !important;
+  font-size: 12px !important;
+  outline: none;
+  border-radius: 0;
+  box-sizing: border-box;
+
+  &:focus {
+    border-color: #007acc !important;
+  }
+}
+
+.popup-items-list {
+  max-height: 150px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+}
+
+.popup-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 12px;
+  color: var(--vscode-text);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 0;
+  gap: 12px;
+  transition: background-color 0.1s ease, color 0.1s ease;
+
+  &:hover {
+    background-color: #2a2d2e;
+    color: #ffffff;
+  }
+}
+
+.popup-shortcut {
+  color: #858585;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.toolbar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 1px;
+}
+
+.key {
+  background: transparent;
+  border: none;
+  color: var(--vscode-text);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 0;
+  height: 28px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  outline: none;
+  border-radius: 0;
+  transition: background-color 0.1s ease, color 0.1s ease;
+
+  &:active {
+    color: var(--vscode-active);
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+
+  &.active {
+    color: var(--vscode-active);
+    background-color: rgba(0, 122, 204, 0.5);
+  }
+
+  i {
+    font-size: 12px;
+  }
+}
+
+@media (orientation: landscape) {
+  .vs-toolbar {
+    padding: 2px 6px;
+    gap: 1px;
+  }
+
+  .key {
+    height: 22px;
+    font-size: 10px;
+    i { font-size: 11px; }
+  }
+
+  .toolbar-popup {
+    bottom: calc(100% + 2px);
+    max-width: 280px;
+  }
+
+  .popup-item {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .popup-items-list {
+    max-height: 100px;
+  }
+}
+
+.vscode-tooltip {
+  position: fixed;
+  z-index: 2000;
+  background-color: #252526;
+  color: #cccccc;
+  border: 1px solid #454545;
+  padding: 8px 12px;
+  font-size: 12px;
+  pointer-events: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+  border-radius: 4px;
+  white-space: normal;
+  word-wrap: break-word;
+  max-width: 280px;
+  width: max-content;
+  min-width: 150px;
+  line-height: 1.4;
+  animation: tooltipFadeIn 0.15s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+

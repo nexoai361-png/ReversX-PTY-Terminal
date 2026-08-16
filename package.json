@@ -9,6 +9,7 @@
     "cordova": "cordova"
   },
   "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
     "@simonwep/pickr": "^1.10.1",
     "@vscode/codicons": "^0.0.46-24",
     "express": "^4.21.2",
