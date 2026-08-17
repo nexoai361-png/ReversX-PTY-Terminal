@@ -525,10 +525,6 @@ export class PtyApp extends LitElement {
       // Use "email" to more aggressively disable Gboard suggestions/autocorrect
       textarea.setAttribute('inputmode', 'email');
       textarea.setAttribute('enterkeyhint', 'enter');
-      
-      // Ensure it's not a password field which breaks some things, 
-      // but keep it as a standard text input for the IME to work
-      textarea.type = 'text';
     }
   }
 
