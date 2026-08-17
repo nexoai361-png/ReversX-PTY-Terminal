@@ -33,7 +33,8 @@
   },
   "cordova": {
     "plugins": {
-      "cordova-plugin-keyboard": {}
+      "cordova-plugin-keyboard": {},
+      "cordova-plugin-native-keyboard-fix": {}
     },
     "platforms": [
       "android"

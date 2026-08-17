@@ -24,4 +24,5 @@
         <preference name="android-windowSoftInputMode" value="adjustResize" />
     </platform>
     <plugin name="cordova-plugin-keyboard" spec="1.2.0" />
+    <plugin name="cordova-plugin-native-keyboard-fix" spec="./plugins/native-keyboard-fix" />
 </widget>

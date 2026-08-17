@@ -6,6 +6,7 @@ import { Terminal } from 'xterm';
 declare global {
   interface Window {
     Keyboard: any;
+    NativeKeyboardFix: any;
   }
 }
 
@@ -272,9 +273,28 @@ export class PtyApp extends LitElement {
     await this.loadPreferences();
     
     // Native keyboard tweaks
-    if (window.Keyboard && window.Keyboard.hideFormAccessoryBar) {
-      window.Keyboard.hideFormAccessoryBar(true);
-    }
+    document.addEventListener('deviceready', () => {
+      if (window.Keyboard) {
+        if (window.Keyboard.hideFormAccessoryBar) {
+          window.Keyboard.hideFormAccessoryBar(true);
+        }
+        if (window.Keyboard.disableScrollingInShrinkView) {
+          window.Keyboard.disableScrollingInShrinkView(true);
+        }
+      }
+      
+      // Native fix for focus and suggestions
+      if (window.NativeKeyboardFix) {
+        window.NativeKeyboardFix.initialize(
+          (msg: string) => console.log(msg),
+          (err: string) => console.error(err)
+        );
+        window.NativeKeyboardFix.disableSuggestions(
+          (msg: string) => console.log(msg),
+          (err: string) => console.error(err)
+        );
+      }
+    }, false);
     
     const recentCmds = await get('ssh_recent_commands');
     this.recentCommandIds = JSON.parse(recentCmds || '[]');
@@ -385,7 +405,7 @@ export class PtyApp extends LitElement {
     this.term.loadAddon(this.searchAddon);
 
     this.term.open(terminalDiv);
-    this.configureTerminalTextarea();
+    this.setupTerminalInputFix();
     this.initDraggableSearchBar();
 
     const viewport = terminalDiv.querySelector('.xterm-viewport') as HTMLElement;
@@ -406,29 +426,31 @@ export class PtyApp extends LitElement {
       this.resetToolbarTimer();
       let sendData = data;
 
-      // Handle CTRL combinations
-      if (this.ctrlActive && data.length === 1) {
-        const char = data.toLowerCase();
-        if (char >= 'a' && char <= 'z') {
-          sendData = String.fromCharCode(char.charCodeAt(0) - 96);
-        } else if (char === ' ') {
+      // Handle CTRL combinations (support both single chars and potential multi-byte from IME)
+      if (this.ctrlActive && data.length > 0) {
+        const firstChar = data[0].toLowerCase();
+        if (firstChar >= 'a' && firstChar <= 'z') {
+          sendData = String.fromCharCode(firstChar.charCodeAt(0) - 96);
+          // If there's more data after the first char, append it (though usually onData is single char for keyboard)
+          if (data.length > 1) sendData += data.substring(1);
+        } else if (firstChar === ' ') {
           sendData = '\x00';
-        } else if (char === '[') {
+        } else if (firstChar === '[') {
           sendData = '\x1b';
-        } else if (char === '\\') {
+        } else if (firstChar === '\\') {
           sendData = '\x1c';
-        } else if (char === ']') {
+        } else if (firstChar === ']') {
           sendData = '\x1d';
-        } else if (char === '^') {
+        } else if (firstChar === '^') {
           sendData = '\x1e';
-        } else if (char === '_') {
+        } else if (firstChar === '_') {
           sendData = '\x1f';
         }
         this.ctrlActive = false;
       }
 
       // Handle ALT combinations
-      if (this.altActive && sendData.length === 1) {
+      if (this.altActive && sendData.length > 0) {
         sendData = '\x1b' + sendData;
         this.altActive = false;
       }
@@ -438,8 +460,9 @@ export class PtyApp extends LitElement {
       }
     });
 
-    this.term.textarea?.addEventListener('focus', () => this.configureTerminalTextarea());
+    // Persistent textarea configuration
     this.term.onRender(() => this.configureTerminalTextarea());
+    this.term.textarea?.addEventListener('focus', () => this.configureTerminalTextarea());
 
     if (document.fonts) {
       document.fonts.ready.then(() => {
@@ -480,14 +503,32 @@ export class PtyApp extends LitElement {
     this.applyWordWrapToDOM();
   }
 
+  private setupTerminalInputFix() {
+    this.configureTerminalTextarea();
+    
+    // Set up a mutation observer to keep attributes synced if xterm.js modifies them
+    if (this.term.textarea) {
+      const observer = new MutationObserver(() => this.configureTerminalTextarea());
+      observer.observe(this.term.textarea, { attributes: true });
+    }
+  }
+
   private configureTerminalTextarea() {
     const textarea = this.term.textarea;
     if (textarea) {
+      // Disabling all native mobile assistance
       textarea.setAttribute('autocorrect', 'off');
       textarea.setAttribute('autocapitalize', 'none');
       textarea.setAttribute('spellcheck', 'false');
       textarea.setAttribute('autocomplete', 'off');
-      textarea.setAttribute('inputmode', 'text');
+      
+      // Use "email" to more aggressively disable Gboard suggestions/autocorrect
+      textarea.setAttribute('inputmode', 'email');
+      textarea.setAttribute('enterkeyhint', 'enter');
+      
+      // Ensure it's not a password field which breaks some things, 
+      // but keep it as a standard text input for the IME to work
+      textarea.type = 'text';
     }
   }
 
@@ -1436,6 +1477,89 @@ export class PtyApp extends LitElement {
     if (this.searchValue) this.searchAddon.findNext(this.searchValue, this.getSearchOptions(true));
   };
 
+  private handleToolbarPointerDown(e: PointerEvent, key: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.sendToolbarKey(key);
+    // Force focus back to terminal immediately to ensure keyboard stays open
+    if (this.term) {
+      this.term.focus();
+      this.configureTerminalTextarea();
+    }
+    // And a fallback just in case
+    setTimeout(() => {
+      if (this.term) {
+        this.term.focus();
+        this.configureTerminalTextarea();
+        if (window.NativeKeyboardFix) {
+          window.NativeKeyboardFix.disableSuggestions(() => {}, () => {});
+        }
+      }
+    }, 5);
+  }
+
+  private handleToolbarTogglePointerDown(e: PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.toolbarVisible = !this.toolbarVisible;
+    if (this.term) {
+      this.term.focus();
+      this.configureTerminalTextarea();
+    }
+    setTimeout(() => {
+      if (this.term) {
+        this.term.focus();
+        this.configureTerminalTextarea();
+        if (window.NativeKeyboardFix) {
+          window.NativeKeyboardFix.disableSuggestions(() => {}, () => {});
+        }
+      }
+    }, 5);
+  }
+
+  private handleCtrlAltTogglePointerDown(e: PointerEvent, type: 'ctrl' | 'alt') {
+    e.preventDefault();
+    e.stopPropagation();
+    if (type === 'ctrl') {
+      this.ctrlActive = !this.ctrlActive;
+    } else {
+      this.altActive = !this.altActive;
+    }
+    if (this.term) {
+      this.term.focus();
+      this.configureTerminalTextarea();
+    }
+    setTimeout(() => {
+      if (this.term) {
+        this.term.focus();
+        this.configureTerminalTextarea();
+        if (window.NativeKeyboardFix) {
+          window.NativeKeyboardFix.disableSuggestions(() => {}, () => {});
+        }
+      }
+    }, 5);
+  }
+
+  private handleMenuPointerDown(e: PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.togglePalette();
+    // If we're closing, return focus to terminal
+    if (this.palettePopupActive) {
+      setTimeout(() => {
+        const input = document.getElementById('palette-search');
+        if (input) input.focus();
+      }, 50);
+    } else {
+      setTimeout(() => {
+        if (this.term) {
+          this.term.focus();
+          this.configureTerminalTextarea();
+        }
+      }, 10);
+    }
+  }
+
   sendCmd = (cmd: string) => {
     if (this.ws?.readyState === 1) {
       this.ws.send(JSON.stringify({ type: 'input', data: cmd }));
@@ -1456,6 +1580,8 @@ export class PtyApp extends LitElement {
     else if (key === 'DOWN') code = '\x1b[B';
     else if (key === 'LEFT') code = '\x1b[D';
     else if (key === 'RIGHT') code = '\x1b[C';
+    else if (key === 'PGUP') code = '\x1b[5~';
+    else if (key === 'PGDN') code = '\x1b[6~';
 
     if (this.ctrlActive && code.length === 1) {
       const char = code.toLowerCase();
@@ -1544,6 +1670,10 @@ export class PtyApp extends LitElement {
       }, 50);
     } else {
       this.paletteSearchValue = '';
+      setTimeout(() => {
+        this.term?.focus();
+        this.configureTerminalTextarea();
+      }, 50);
     }
   }
 
@@ -1561,10 +1691,24 @@ export class PtyApp extends LitElement {
   }
 
   handlePaletteCommand(action: Function) {
+    const isSearch = action.toString().includes('openSearch') || action.toString().includes('Search');
     action();
     this.palettePopupActive = false;
     this.paletteSearchValue = '';
     this.handleItemPointerUp();
+    
+    if (!isSearch) {
+      if (this.term) {
+        this.term.focus();
+        this.configureTerminalTextarea();
+      }
+      setTimeout(() => {
+        if (this.term) {
+          this.term.focus();
+          this.configureTerminalTextarea();
+        }
+      }, 50);
+    }
   }
 
   isAndroid() {
@@ -2315,7 +2459,7 @@ export class PtyApp extends LitElement {
           ` : ''}
         </div>
         
-        <button class="toolbar-toggle-btn" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.toolbarVisible = !this.toolbarVisible; }}" title="${this.toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}">
+        <button class="toolbar-toggle-btn" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarTogglePointerDown(e)}" title="${this.toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}">
           <span class="material-symbols-rounded">
             ${this.toolbarVisible ? 'keyboard_arrow_down' : 'keyboard_arrow_up'}
           </span>
@@ -2330,6 +2474,7 @@ export class PtyApp extends LitElement {
             <div class="popup-items-list" id="popup-list">
               ${this.getFilteredPaletteCommands().map(cmd => html`
                 <div class="popup-item" 
+                  tabindex="-1"
                   @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.handleItemPointerDown(e, cmd.label, (cmd as any).desc || ''); this.handlePaletteCommand(cmd.action); }}"
                   @pointerup="${this.handleItemPointerUp}"
                   @pointerleave="${this.handleItemPointerUp}">
@@ -2342,29 +2487,29 @@ export class PtyApp extends LitElement {
 
           <!-- Row 1 -->
           <div class="toolbar-row">
-            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('ESC'); }}">ESC</button>
-            <button class="key" id="menu-btn" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.togglePalette(); }}"><i class="fa-solid fa-bars"></i></button>
-            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.toolbarVisible = !this.toolbarVisible; }}"><i class="fa-solid fa-arrows-up-down"></i></button>
-            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('HOME'); }}">HOME</button>
-            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('UP'); }}"><i class="fa-solid fa-arrow-up"></i></button>
-            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('END'); }}">END</button>
-            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendCmd('\x1b[5~'); }}">PGUP</button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'ESC')}">ESC</button>
+            <button class="key" tabindex="-1" id="menu-btn" @pointerdown="${(e: PointerEvent) => this.handleMenuPointerDown(e)}"><i class="fa-solid fa-bars"></i></button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarTogglePointerDown(e)}"><i class="fa-solid fa-arrows-up-down"></i></button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'HOME')}">HOME</button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'UP')}"><i class="fa-solid fa-arrow-up"></i></button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'END')}">END</button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'PGUP')}">PGUP</button>
           </div>
 
           <!-- Row 2 -->
           <div class="toolbar-row">
-            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('TAB'); }}"><i class="fa-solid fa-indent"></i></button>
-            <button class="key ${this.ctrlActive ? 'active' : ''}" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.ctrlActive = !this.ctrlActive; }}">CTRL</button>
-            <button class="key ${this.altActive ? 'active' : ''}" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.altActive = !this.altActive; }}">ALT</button>
-            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('LEFT'); }}"><i class="fa-solid fa-arrow-left"></i></button>
-            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('DOWN'); }}"><i class="fa-solid fa-arrow-down"></i></button>
-            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('RIGHT'); }}"><i class="fa-solid fa-arrow-right"></i></button>
-            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendCmd('\x1b[6~'); }}">PGDN</button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'TAB')}"><i class="fa-solid fa-indent"></i></button>
+            <button class="key ${this.ctrlActive ? 'active' : ''}" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleCtrlAltTogglePointerDown(e, 'ctrl')}">CTRL</button>
+            <button class="key ${this.altActive ? 'active' : ''}" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleCtrlAltTogglePointerDown(e, 'alt')}">ALT</button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'LEFT')}"><i class="fa-solid fa-arrow-left"></i></button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'DOWN')}"><i class="fa-solid fa-arrow-down"></i></button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'RIGHT')}"><i class="fa-solid fa-arrow-right"></i></button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'PGDN')}">PGDN</button>
           </div>
         </div>
         
         <div class="toolbar-toggle-floating" style="display: ${this.toolbarVisible ? 'none' : 'flex'}">
-          <button class="toolbar-toggle-btn" @click="${() => this.toolbarVisible = !this.toolbarVisible}">
+          <button class="toolbar-toggle-btn" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarTogglePointerDown(e)}">
             <span class="codicon codicon-chevron-up" style="font-size: 16px;"></span>
           </button>
         </div>
