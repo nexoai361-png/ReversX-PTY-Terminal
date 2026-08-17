@@ -2,6 +2,13 @@ import { LitElement, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { computePosition, flip, shift, offset } from '@floating-ui/dom';
 import { Terminal } from 'xterm';
+
+declare global {
+  interface Window {
+    Keyboard: any;
+  }
+}
+
 import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import { SearchAddon } from 'xterm-addon-search';
@@ -264,6 +271,11 @@ export class PtyApp extends LitElement {
     
     await this.loadPreferences();
     
+    // Native keyboard tweaks
+    if (window.Keyboard && window.Keyboard.hideFormAccessoryBar) {
+      window.Keyboard.hideFormAccessoryBar(true);
+    }
+    
     const recentCmds = await get('ssh_recent_commands');
     this.recentCommandIds = JSON.parse(recentCmds || '[]');
     
@@ -355,6 +367,7 @@ export class PtyApp extends LitElement {
       convertEol: true,
       allowProposedApi: true,
       drawBoldTextInBrightColors: true,
+      screenReaderMode: true,
       theme: customTheme,
       fontSize: this.terminalFontSize,
       fontFamily: this.terminalFont,
@@ -372,6 +385,7 @@ export class PtyApp extends LitElement {
     this.term.loadAddon(this.searchAddon);
 
     this.term.open(terminalDiv);
+    this.configureTerminalTextarea();
     this.initDraggableSearchBar();
 
     const viewport = terminalDiv.querySelector('.xterm-viewport') as HTMLElement;
@@ -392,6 +406,7 @@ export class PtyApp extends LitElement {
       this.resetToolbarTimer();
       let sendData = data;
 
+      // Handle CTRL combinations
       if (this.ctrlActive && data.length === 1) {
         const char = data.toLowerCase();
         if (char >= 'a' && char <= 'z') {
@@ -412,6 +427,7 @@ export class PtyApp extends LitElement {
         this.ctrlActive = false;
       }
 
+      // Handle ALT combinations
       if (this.altActive && sendData.length === 1) {
         sendData = '\x1b' + sendData;
         this.altActive = false;
@@ -421,6 +437,9 @@ export class PtyApp extends LitElement {
         this.ws.send(JSON.stringify({ type: 'input', data: sendData }));
       }
     });
+
+    this.term.textarea?.addEventListener('focus', () => this.configureTerminalTextarea());
+    this.term.onRender(() => this.configureTerminalTextarea());
 
     if (document.fonts) {
       document.fonts.ready.then(() => {
@@ -459,6 +478,17 @@ export class PtyApp extends LitElement {
 
     // Apply word wrap styling
     this.applyWordWrapToDOM();
+  }
+
+  private configureTerminalTextarea() {
+    const textarea = this.term.textarea;
+    if (textarea) {
+      textarea.setAttribute('autocorrect', 'off');
+      textarea.setAttribute('autocapitalize', 'none');
+      textarea.setAttribute('spellcheck', 'false');
+      textarea.setAttribute('autocomplete', 'off');
+      textarea.setAttribute('inputmode', 'text');
+    }
   }
 
   private defaultMacros = [
@@ -2285,7 +2315,7 @@ export class PtyApp extends LitElement {
           ` : ''}
         </div>
         
-        <button class="toolbar-toggle-btn" @click="${() => this.toolbarVisible = !this.toolbarVisible}" title="${this.toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}">
+        <button class="toolbar-toggle-btn" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.toolbarVisible = !this.toolbarVisible; }}" title="${this.toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}">
           <span class="material-symbols-rounded">
             ${this.toolbarVisible ? 'keyboard_arrow_down' : 'keyboard_arrow_up'}
           </span>
@@ -2300,9 +2330,9 @@ export class PtyApp extends LitElement {
             <div class="popup-items-list" id="popup-list">
               ${this.getFilteredPaletteCommands().map(cmd => html`
                 <div class="popup-item" 
-                  @click="${() => this.handlePaletteCommand(cmd.action)}"
-                  @pointerdown="${(e: PointerEvent) => this.handleItemPointerDown(e, cmd.label, (cmd as any).desc || '')}"
-                  @pointerup="${this.handleItemPointerUp}">
+                  @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.handleItemPointerDown(e, cmd.label, (cmd as any).desc || ''); this.handlePaletteCommand(cmd.action); }}"
+                  @pointerup="${this.handleItemPointerUp}"
+                  @pointerleave="${this.handleItemPointerUp}">
                   <span class="popup-label">${cmd.label}</span>
                   <span class="popup-shortcut">${cmd.shortcut}</span>
                 </div>
@@ -2312,24 +2342,24 @@ export class PtyApp extends LitElement {
 
           <!-- Row 1 -->
           <div class="toolbar-row">
-            <button class="key" @click="${() => this.sendToolbarKey('ESC')}">ESC</button>
-            <button class="key" id="menu-btn" @click="${this.togglePalette}"><i class="fa-solid fa-bars"></i></button>
-            <button class="key" @click="${() => this.toolbarVisible = !this.toolbarVisible}"><i class="fa-solid fa-arrows-up-down"></i></button>
-            <button class="key" @click="${() => this.sendToolbarKey('HOME')}">HOME</button>
-            <button class="key" @click="${() => this.sendToolbarKey('UP')}"><i class="fa-solid fa-arrow-up"></i></button>
-            <button class="key" @click="${() => this.sendToolbarKey('END')}">END</button>
-            <button class="key" @click="${() => this.sendCmd('\x1b[5~')}">PGUP</button>
+            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('ESC'); }}">ESC</button>
+            <button class="key" id="menu-btn" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.togglePalette(); }}"><i class="fa-solid fa-bars"></i></button>
+            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.toolbarVisible = !this.toolbarVisible; }}"><i class="fa-solid fa-arrows-up-down"></i></button>
+            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('HOME'); }}">HOME</button>
+            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('UP'); }}"><i class="fa-solid fa-arrow-up"></i></button>
+            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('END'); }}">END</button>
+            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendCmd('\x1b[5~'); }}">PGUP</button>
           </div>
 
           <!-- Row 2 -->
           <div class="toolbar-row">
-            <button class="key" @click="${() => this.sendToolbarKey('TAB')}"><i class="fa-solid fa-indent"></i></button>
-            <button class="key ${this.ctrlActive ? 'active' : ''}" @click="${() => this.ctrlActive = !this.ctrlActive}">CTRL</button>
-            <button class="key ${this.altActive ? 'active' : ''}" @click="${() => this.altActive = !this.altActive}">ALT</button>
-            <button class="key" @click="${() => this.sendToolbarKey('LEFT')}"><i class="fa-solid fa-arrow-left"></i></button>
-            <button class="key" @click="${() => this.sendToolbarKey('DOWN')}"><i class="fa-solid fa-arrow-down"></i></button>
-            <button class="key" @click="${() => this.sendToolbarKey('RIGHT')}"><i class="fa-solid fa-arrow-right"></i></button>
-            <button class="key" @click="${() => this.sendCmd('\x1b[6~')}">PGDN</button>
+            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('TAB'); }}"><i class="fa-solid fa-indent"></i></button>
+            <button class="key ${this.ctrlActive ? 'active' : ''}" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.ctrlActive = !this.ctrlActive; }}">CTRL</button>
+            <button class="key ${this.altActive ? 'active' : ''}" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.altActive = !this.altActive; }}">ALT</button>
+            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('LEFT'); }}"><i class="fa-solid fa-arrow-left"></i></button>
+            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('DOWN'); }}"><i class="fa-solid fa-arrow-down"></i></button>
+            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendToolbarKey('RIGHT'); }}"><i class="fa-solid fa-arrow-right"></i></button>
+            <button class="key" @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.sendCmd('\x1b[6~'); }}">PGDN</button>
           </div>
         </div>
         

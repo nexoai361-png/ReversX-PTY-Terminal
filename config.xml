@@ -20,5 +20,8 @@
         <icon src="www/app-icon.png" />
         <preference name="AndroidWindowSplashScreenAnimatedIcon" value="www/splash-icon.png" />
         <preference name="AndroidWindowSplashScreenBackground" value="#1E1E1E" />
+        <preference name="KeyboardDisplayRequiresUserAction" value="false" />
+        <preference name="android-windowSoftInputMode" value="adjustResize" />
     </platform>
+    <plugin name="cordova-plugin-keyboard" spec="1.2.0" />
 </widget>
