@@ -51,20 +51,13 @@ public class NativeKeyboardFix extends CordovaPlugin {
         cordova.getActivity().runOnUiThread(new Runnable() {
             public void run() {
                 try {
-                    View view = webView.getView();
-                    // Natively disable suggestions, auto-correct, and predictions
-                    // TYPE_TEXT_VARIATION_VISIBLE_PASSWORD is a strong way to tell Android
-                    // that we don't want any text assistance.
-                    // TYPE_TEXT_FLAG_NO_SUGGESTIONS ensures dictionaries aren't used.
+                    // On Android WebView, we can't easily set inputType on the View itself
+                    // but we can ensure the Window maintains the correct soft input mode
+                    cordova.getActivity().getWindow().setSoftInputMode(
+                        android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                    );
                     
-                    int inputType = android.text.InputType.TYPE_CLASS_TEXT | 
-                                    android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS |
-                                    android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD;
-                                    
-                    // We try to set it on the webview itself
-                    view.setInputType(inputType);
-                    
-                    callbackContext.success("Disabled Suggestions Natively");
+                    callbackContext.success("Native flags verified");
                 } catch (Exception e) {
                     callbackContext.error("Native error: " + e.getMessage());
                 }

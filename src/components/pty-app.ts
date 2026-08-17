@@ -1477,16 +1477,15 @@ export class PtyApp extends LitElement {
     if (this.searchValue) this.searchAddon.findNext(this.searchValue, this.getSearchOptions(true));
   };
 
-  private handleToolbarPointerDown(e: PointerEvent, key: string) {
-    e.preventDefault();
+  private handleToolbarPointerDown(e: UIEvent, key: string) {
+    if (e.cancelable) e.preventDefault();
     e.stopPropagation();
     this.sendToolbarKey(key);
-    // Force focus back to terminal immediately to ensure keyboard stays open
+    // Immediate and repeated focus to ensure keyboard stability
     if (this.term) {
       this.term.focus();
       this.configureTerminalTextarea();
     }
-    // And a fallback just in case
     setTimeout(() => {
       if (this.term) {
         this.term.focus();
@@ -1495,11 +1494,11 @@ export class PtyApp extends LitElement {
           window.NativeKeyboardFix.disableSuggestions(() => {}, () => {});
         }
       }
-    }, 5);
+    }, 10);
   }
 
-  private handleToolbarTogglePointerDown(e: PointerEvent) {
-    e.preventDefault();
+  private handleToolbarTogglePointerDown(e: UIEvent) {
+    if (e.cancelable) e.preventDefault();
     e.stopPropagation();
     this.toolbarVisible = !this.toolbarVisible;
     if (this.term) {
@@ -1514,11 +1513,11 @@ export class PtyApp extends LitElement {
           window.NativeKeyboardFix.disableSuggestions(() => {}, () => {});
         }
       }
-    }, 5);
+    }, 10);
   }
 
-  private handleCtrlAltTogglePointerDown(e: PointerEvent, type: 'ctrl' | 'alt') {
-    e.preventDefault();
+  private handleCtrlAltTogglePointerDown(e: UIEvent, type: 'ctrl' | 'alt') {
+    if (e.cancelable) e.preventDefault();
     e.stopPropagation();
     if (type === 'ctrl') {
       this.ctrlActive = !this.ctrlActive;
@@ -1537,11 +1536,11 @@ export class PtyApp extends LitElement {
           window.NativeKeyboardFix.disableSuggestions(() => {}, () => {});
         }
       }
-    }, 5);
+    }, 10);
   }
 
-  private handleMenuPointerDown(e: PointerEvent) {
-    e.preventDefault();
+  private handleMenuPointerDown(e: UIEvent) {
+    if (e.cancelable) e.preventDefault();
     e.stopPropagation();
     this.togglePalette();
     // If we're closing, return focus to terminal
@@ -1551,6 +1550,10 @@ export class PtyApp extends LitElement {
         if (input) input.focus();
       }, 50);
     } else {
+      if (this.term) {
+        this.term.focus();
+        this.configureTerminalTextarea();
+      }
       setTimeout(() => {
         if (this.term) {
           this.term.focus();
@@ -2487,24 +2490,24 @@ export class PtyApp extends LitElement {
 
           <!-- Row 1 -->
           <div class="toolbar-row">
-            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'ESC')}">ESC</button>
-            <button class="key" tabindex="-1" id="menu-btn" @pointerdown="${(e: PointerEvent) => this.handleMenuPointerDown(e)}"><i class="fa-solid fa-bars"></i></button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarTogglePointerDown(e)}"><i class="fa-solid fa-arrows-up-down"></i></button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'HOME')}">HOME</button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'UP')}"><i class="fa-solid fa-arrow-up"></i></button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'END')}">END</button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'PGUP')}">PGUP</button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'ESC')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'ESC')}">ESC</button>
+            <button class="key" tabindex="-1" id="menu-btn" @pointerdown="${(e: UIEvent) => this.handleMenuPointerDown(e)}" @touchstart="${(e: UIEvent) => this.handleMenuPointerDown(e)}"><i class="fa-solid fa-bars"></i></button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarTogglePointerDown(e)}" @touchstart="${(e: UIEvent) => this.handleToolbarTogglePointerDown(e)}"><i class="fa-solid fa-arrows-up-down"></i></button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'HOME')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'HOME')}">HOME</button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'UP')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'UP')}"><i class="fa-solid fa-arrow-up"></i></button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'END')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'END')}">END</button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'PGUP')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'PGUP')}">PGUP</button>
           </div>
 
           <!-- Row 2 -->
           <div class="toolbar-row">
-            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'TAB')}"><i class="fa-solid fa-indent"></i></button>
-            <button class="key ${this.ctrlActive ? 'active' : ''}" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleCtrlAltTogglePointerDown(e, 'ctrl')}">CTRL</button>
-            <button class="key ${this.altActive ? 'active' : ''}" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleCtrlAltTogglePointerDown(e, 'alt')}">ALT</button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'LEFT')}"><i class="fa-solid fa-arrow-left"></i></button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'DOWN')}"><i class="fa-solid fa-arrow-down"></i></button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'RIGHT')}"><i class="fa-solid fa-arrow-right"></i></button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarPointerDown(e, 'PGDN')}">PGDN</button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'TAB')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'TAB')}"><i class="fa-solid fa-indent"></i></button>
+            <button class="key ${this.ctrlActive ? 'active' : ''}" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleCtrlAltTogglePointerDown(e, 'ctrl')}" @touchstart="${(e: UIEvent) => this.handleCtrlAltTogglePointerDown(e, 'ctrl')}">CTRL</button>
+            <button class="key ${this.altActive ? 'active' : ''}" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleCtrlAltTogglePointerDown(e, 'alt')}" @touchstart="${(e: UIEvent) => this.handleCtrlAltTogglePointerDown(e, 'alt')}">ALT</button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'LEFT')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'LEFT')}"><i class="fa-solid fa-arrow-left"></i></button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'DOWN')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'DOWN')}"><i class="fa-solid fa-arrow-down"></i></button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'RIGHT')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'RIGHT')}"><i class="fa-solid fa-arrow-right"></i></button>
+            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'PGDN')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'PGDN')}">PGDN</button>
           </div>
         </div>
         
