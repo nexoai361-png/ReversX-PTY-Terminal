@@ -120,6 +120,7 @@ export class PtyApp extends LitElement {
   @state() batteryLevel: string = '--%';
   @state() batteryIcon: string = '🔋';
   @state() batteryCharging: boolean = false;
+  @state() docLang: string = 'bn';
 
   // Search/Find Bar state
   @state() searchActive: boolean = false;
@@ -1205,6 +1206,23 @@ export class PtyApp extends LitElement {
     }
   }
 
+  copyCommandText(text: string, event: Event) {
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = event.currentTarget as HTMLElement;
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="codicon codicon-check" style="color: #4caf50; font-size: 11px;"></span> Copied!';
+      btn.style.borderColor = '#4caf50';
+      btn.style.color = '#4caf50';
+      setTimeout(() => {
+        btn.innerHTML = originalHtml;
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }, 2000);
+    }).catch(() => {
+      // Fallback
+    });
+  }
+
   async saveMacros() {
     await set('ssh_macros', JSON.stringify(this.macros));
   }
@@ -2213,7 +2231,224 @@ export class PtyApp extends LitElement {
         <div class="setup-pane">
           <div class="setup-form" style="max-width: 800px;">
             <h2>Documentation & Android Guide</h2>
-            
+
+            <!-- Termux WebSocket & SSH Setup Card -->
+            <div class="doc-card" style="border: 1px solid var(--accent, #3b82f6); background: rgba(59, 130, 246, 0.05);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <div class="doc-badge" style="background: var(--accent, #3b82f6); margin: 0; color: #fff;">
+                  ${this.docLang === 'bn' ? 'টার্মাক্স সম্পূর্ণ গাইড' : 'TERMUX COMPLETE GUIDE'}
+                </div>
+                <div style="display: flex; gap: 6px;">
+                  <button style="padding: 4px 10px; font-size: 11px; height: auto; background: ${this.docLang === 'bn' ? 'var(--accent, #3b82f6)' : 'rgba(255,255,255,0.08)'}; color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; cursor: pointer; font-weight: 600;" @click="${() => this.docLang = 'bn'}">বাংলা (Bengali)</button>
+                  <button style="padding: 4px 10px; font-size: 11px; height: auto; background: ${this.docLang === 'en' ? 'var(--accent, #3b82f6)' : 'rgba(255,255,255,0.08)'}; color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; cursor: pointer; font-weight: 600;" @click="${() => this.docLang = 'en'}">English</button>
+                </div>
+              </div>
+
+              ${this.docLang === 'bn' ? html`
+                <h3>Termux এ WebSocket Bridge এবং SSH সার্ভার সেটআপ</h3>
+                <p class="description" style="font-size: 13px; color: var(--text-normal); margin-bottom: 16px;">
+                  এই PTY টার্মিনাল অ্যাপ্লিকেশনটিকে সচল করতে আপনার অ্যান্ড্রোয়েড ফোনে Termux-এ একটি লোকাল ব্যাকএন্ড এবং SSH সংযোগ স্থাপন করতে হবে। নিচের সহজ ধাপগুলো অনুসরণ করুন:
+                </p>
+
+                <div class="doc-step">
+                  <div class="doc-step-num">1</div>
+                  <div>
+                    <strong>প্রয়োজনীয় প্যাকেজ ডাউনলোড ও ইন্সটল করুন</strong>
+                    <p class="description" style="margin-bottom: 8px;">Termux অ্যাপ ওপেন করে নিচের কমান্ডটি রান করুন (এটি NodeJS, OpenSSH এবং Git অটো-ইন্সটল করবে):</p>
+                    <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
+                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('pkg update && pkg install -y nodejs openssh git', e)}">
+                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                        </button>
+                      </div>
+                      <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">pkg update && pkg install -y nodejs openssh git</code>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="doc-step">
+                  <div class="doc-step-num">2</div>
+                  <div>
+                    <strong>Termux এর জন্য পাসওয়ার্ড ও ইউজার সেট করুন</strong>
+                    <p class="description" style="margin-bottom: 8px;">টার্মিনালে প্রবেশাধিকারের জন্য একটি সিকিউর পাসওয়ার্ড তৈরি করুন:</p>
+                    <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
+                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('passwd', e)}">
+                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                        </button>
+                      </div>
+                      <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">passwd</code>
+                    </div>
+
+                    <p class="description" style="margin-top: 8px; margin-bottom: 8px;">আপনার বর্তমান Termux ইউজারনেমটি জানতে নিচের কমান্ডটি রান করুন:</p>
+                    <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
+                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('whoami', e)}">
+                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                        </button>
+                      </div>
+                      <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">whoami</code>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="doc-step">
+                  <div class="doc-step-num">3</div>
+                  <div>
+                    <strong>প্রজেক্ট ডাউনলোড ও অপ্টিমাইজড সেটআপ রান করুন</strong>
+                    <p class="description" style="margin-bottom: 8px;">আপনার গিটহাব রিপোজিটরি ক্লোন করুন এবং অপ্টিমাইজড সেটআপ স্ক্রিপ্টটি চালু করুন যা দ্রুত মেমোরি ও ডেটা সেভ করে ইন্সটলেশন সম্পন্ন করবে:</p>
+                    <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
+                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('git clone <your-repo-url>\ncd <repo-folder>\nchmod +x setup.sh && ./setup.sh', e)}">
+                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                        </button>
+                      </div>
+                      <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">git clone &lt;your-repo-url&gt;<br>cd &lt;repo-folder&gt;<br>chmod +x setup.sh && ./setup.sh</code>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="doc-step">
+                  <div class="doc-step-num">4</div>
+                  <div>
+                    <strong>লোকাল SSHD এবং WebSocket ব্রিজ সার্ভার চালু করুন</strong>
+                    <p class="description" style="margin-bottom: 8px;">টার্মিনাল ব্রিজ ও কানেকশন অন করতে নিচের দুটি কমান্ড রান করুন:</p>
+                    <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
+                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('sshd\nnode server.js', e)}">
+                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                        </button>
+                      </div>
+                      <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">sshd<br>node server.js</code>
+                    </div>
+                    <p class="description" style="margin-top: 6px;">সার্ভার সফলভাবে চালু হলে আপনি <span style="color: #10B981;">PTY BACKEND PRO ENGINE ONLINE</span> মেসেজটি দেখতে পাবেন।</p>
+                  </div>
+                </div>
+
+                <div class="doc-step">
+                  <div class="doc-step-num">5</div>
+                  <div>
+                    <strong>PTY Terminal অ্যাপ্লিকেশন থেকে কানেক্ট করুন</strong>
+                    <p class="description">আপনার ব্রাউজার বা Cordova APK অ্যাপ থেকে <strong>Config</strong> ট্যাবে যান। নিচের ফিল্ডগুলো এভাবে পূরণ করুন:</p>
+                    <ul style="font-size: 13px; color: var(--text-normal); padding-left: 20px; line-height: 1.6; margin-top: 6px;">
+                      <li><strong>Host:</strong> <code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">127.0.0.1</code></li>
+                      <li><strong>Port:</strong> <code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">8022</code></li>
+                      <li><strong>Username:</strong> Termux-এ <code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">whoami</code> থেকে প্রাপ্ত ইউজারনেম।</li>
+                      <li><strong>Password:</strong> আপনার সেট করা পাসওয়ার্ড।</li>
+                      <li><strong>WebSocket Bridge URL:</strong> <code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">ws://127.0.0.1:3000</code></li>
+                    </ul>
+                    <p class="description" style="margin-top: 8px;">সবশেষে <strong>Connect Session</strong> এ ট্যাপ করুন এবং স্মুথ পিটিআই টার্মিনাল অভিজ্ঞতা উপভোগ করুন!</p>
+                  </div>
+                </div>
+              ` : html`
+                <h3>Termux WebSocket Bridge & SSH Server Setup</h3>
+                <p class="description" style="font-size: 13px; color: var(--text-normal); margin-bottom: 16px;">
+                  To enable live interactive terminal sessions, a local backend bridge and SSH daemon must be running in Termux on your Android device. Follow these step-by-step instructions:
+                </p>
+
+                <div class="doc-step">
+                  <div class="doc-step-num">1</div>
+                  <div>
+                    <strong>Install Required Termux Packages</strong>
+                    <p class="description" style="margin-bottom: 8px;">Open Termux and execute the following command to download NodeJS, OpenSSH, and Git:</p>
+                    <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
+                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('pkg update && pkg install -y nodejs openssh git', e)}">
+                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                        </button>
+                      </div>
+                      <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">pkg update && pkg install -y nodejs openssh git</code>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="doc-step">
+                  <div class="doc-step-num">2</div>
+                  <div>
+                    <strong>Setup Username & Password</strong>
+                    <p class="description" style="margin-bottom: 8px;">Create a secure connection password for terminal authentication:</p>
+                    <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
+                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('passwd', e)}">
+                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                        </button>
+                      </div>
+                      <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">passwd</code>
+                    </div>
+
+                    <p class="description" style="margin-top: 8px; margin-bottom: 8px;">Retrieve your active Termux username needed in connection configuration:</p>
+                    <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
+                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('whoami', e)}">
+                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                        </button>
+                      </div>
+                      <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">whoami</code>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="doc-step">
+                  <div class="doc-step-num">3</div>
+                  <div>
+                    <strong>Clone Repository & Run Optimized Setup</strong>
+                    <p class="description" style="margin-bottom: 8px;">Clone your repository and run our lightweight installer which minimizes bandwidth and resource consumption:</p>
+                    <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
+                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('git clone <your-repo-url>\ncd <repo-folder>\nchmod +x setup.sh && ./setup.sh', e)}">
+                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                        </button>
+                      </div>
+                      <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">git clone &lt;your-repo-url&gt;<br>cd &lt;repo-folder&gt;<br>chmod +x setup.sh && ./setup.sh</code>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="doc-step">
+                  <div class="doc-step-num">4</div>
+                  <div>
+                    <strong>Start SSHD Daemon & PTY WebSocket Engine</strong>
+                    <p class="description" style="margin-bottom: 8px;">Spin up the server instances using the commands below:</p>
+                    <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
+                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('sshd\nnode server.js', e)}">
+                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                        </button>
+                      </div>
+                      <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">sshd<br>node server.js</code>
+                    </div>
+                    <p class="description" style="margin-top: 6px;">Once active, the terminal console will output <span style="color: #10B981;">PTY BACKEND PRO ENGINE ONLINE</span>.</p>
+                  </div>
+                </div>
+
+                <div class="doc-step">
+                  <div class="doc-step-num">5</div>
+                  <div>
+                    <strong>Connect From PTY Terminal App</strong>
+                    <p class="description">Go to the <strong>Config</strong> tab in your Cordova APK or browser, and enter the following settings:</p>
+                    <ul style="font-size: 13px; color: var(--text-normal); padding-left: 20px; line-height: 1.6; margin-top: 6px;">
+                      <li><strong>Host:</strong> <code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">127.0.0.1</code></li>
+                      <li><strong>Port:</strong> <code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">8022</code></li>
+                      <li><strong>Username:</strong> The username returned by <code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">whoami</code> in Step 2.</li>
+                      <li><strong>Password:</strong> The password you defined in Step 2.</li>
+                      <li><strong>WebSocket Bridge URL:</strong> <code style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">ws://127.0.0.1:3000</code></li>
+                    </ul>
+                    <p class="description" style="margin-top: 8px;">Tap on <strong>Connect Session</strong> and enjoy responsive physical shell PTY controls!</p>
+                  </div>
+                </div>
+              `}
+            </div>
+
             <div class="doc-card">
               <div class="doc-badge">ANDROID OPTIMIZATION</div>
               <h3>How to Save PTY Terminal from Auto-Kill</h3>
