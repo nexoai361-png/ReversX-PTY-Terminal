@@ -8,11 +8,9 @@
         "@floating-ui/dom": "^1.8.0",
         "@simonwep/pickr": "^1.10.1",
         "@vscode/codicons": "^0.0.46-24",
-        "cordova-plugin-keyboard": "1.2.0",
         "express": "^4.21.2",
         "idb-keyval": "^6.3.0",
         "lit": "^3.3.3",
-        "material-symbols": "^0.46.0",
         "ssh2": "^1.16.0",
         "vanilla-picker": "^2.12.3",
         "ws": "^8.18.0",
@@ -340,8 +338,6 @@
 
     "cordova-lib": ["cordova-lib@12.0.2", "", { "dependencies": { "cordova-common": "^5.0.0", "cordova-fetch": "^4.0.0", "cordova-serve": "^4.0.1", "dep-graph": "^1.1.0", "detect-indent": "^6.1.0", "detect-newline": "^3.1.0", "elementtree": "^0.1.7", "execa": "^5.1.1", "globby": "^11.1.0", "init-package-json": "^6.0.0", "md5-file": "^5.0.0", "semver": "^7.5.0", "stringify-package": "^1.0.1", "write-file-atomic": "^5.0.0" } }, "sha512-ewel8gaeJNwDr10QPL45tYrG6QPIiNZ25KLU6lb2IfaLeCPtwFTaPq0AvBN5uFpkGr0vRqYRcMX4+RSJ5iqmiw=="],
 
-    "cordova-plugin-keyboard": ["cordova-plugin-keyboard@1.2.0", "", {}, "sha512-Zng4SgDQQ2BCqeDOvrsgNlM9tcjnxmJoh0Qhex0KltMsoR0g/ONbMTpaVvI8EhNKVO8HJPnhFxxzHxrCPLQ7sQ=="],
-
     "cordova-serve": ["cordova-serve@4.0.1", "", { "dependencies": { "chalk": "^3.0.0", "compression": "^1.7.4", "express": "^4.17.1", "open": "^7.0.3", "which": "^2.0.2" } }, "sha512-YbfXaZ60yr5dkqmDFQgrU7TSKnzCqYsxHgIUzDeX8RggZb6mz1F9jMfUBbaYyaU7JjcuJ0aoRPYLvwSGQVhGkw=="],
 
     "core-util-is": ["core-util-is@1.0.2", "", {}, "sha512-3lqz5YjWTYnW6dlDa5TLaTCcShfar1e40rmcJVwCBJC6mWlFuj0eCHIElmG1g5kyuJ/GD+8Wn4FFCcz4gJPfaQ=="],
@@ -659,8 +655,6 @@
     "make-dir": ["make-dir@3.1.0", "", { "dependencies": { "semver": "^6.0.0" } }, "sha512-g3FeP20LNwhALb/6Cz6Dd4F2ngze0jz7tbzrD2wAV+o9FeNHe4rL+yK2md0J/fiSf1sa1ADhXqi5+oVwOM/eGw=="],
 
     "make-fetch-happen": ["make-fetch-happen@11.1.1", "", { "dependencies": { "agentkeepalive": "^4.2.1", "cacache": "^17.0.0", "http-cache-semantics": "^4.1.1", "http-proxy-agent": "^5.0.0", "https-proxy-agent": "^5.0.0", "is-lambda": "^1.0.1", "lru-cache": "^7.7.1", "minipass": "^5.0.0", "minipass-fetch": "^3.0.0", "minipass-flush": "^1.0.5", "minipass-pipeline": "^1.2.4", "negotiator": "^0.6.3", "promise-retry": "^2.0.1", "socks-proxy-agent": "^7.0.0", "ssri": "^10.0.0" } }, "sha512-rLWS7GCSTcEujjVBs2YqG7Y4643u8ucvCJeSRqiLYhesrDuzeuFIk37xREzAsfQaqzl8b9rNCE4m6J8tvX4Q8w=="],
-
-    "material-symbols": ["material-symbols@0.46.0", "", {}, "sha512-YxmTXwOhLOI6EupAwFfxFERbaDe61dG/tveOSy2HecndGKqvJ74WqXrrXLNWpIGDkk6TDpieuQPDS+hA7+z3Ig=="],
 
     "math-intrinsics": ["math-intrinsics@1.1.0", "", {}, "sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g=="],
 

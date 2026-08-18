@@ -12,11 +12,9 @@
     "@floating-ui/dom": "^1.8.0",
     "@simonwep/pickr": "^1.10.1",
     "@vscode/codicons": "^0.0.46-24",
-    "cordova-plugin-keyboard": "1.2.0",
     "express": "^4.21.2",
     "idb-keyval": "^6.3.0",
     "lit": "^3.3.3",
-    "material-symbols": "^0.46.0",
     "ssh2": "^1.16.0",
     "vanilla-picker": "^2.12.3",
     "ws": "^8.18.0",
@@ -30,14 +28,5 @@
     "sass": "^1.102.0",
     "typescript": "^7.0.2",
     "vite": "^8.2.0"
-  },
-  "cordova": {
-    "plugins": {
-      "cordova-plugin-keyboard": {},
-      "cordova-plugin-native-keyboard-fix": {}
-    },
-    "platforms": [
-      "android"
-    ]
   }
 }

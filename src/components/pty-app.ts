@@ -2,14 +2,6 @@ import { LitElement, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { computePosition, flip, shift, offset } from '@floating-ui/dom';
 import { Terminal } from 'xterm';
-
-declare global {
-  interface Window {
-    Keyboard: any;
-    NativeKeyboardFix: any;
-  }
-}
-
 import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import { SearchAddon } from 'xterm-addon-search';
@@ -31,6 +23,7 @@ export class PtyApp extends LitElement {
   @state() port: string = '8022';
   @state() user: string = 'termux';
   @state() pass: string = '';
+  @state() wsBridgeUrl: string = '';
   @state() isPasswordVisible: boolean = false;
 
   // Select Dropdowns active state
@@ -39,8 +32,14 @@ export class PtyApp extends LitElement {
   @state() themeDropdownActive: boolean = false;
   @state() animationDropdownActive: boolean = false;
   @state() cursorStyleDropdownActive: boolean = false;
+  @state() uiStyleDropdownActive: boolean = false;
+  @state() uiAnimationDropdownActive: boolean = false;
 
   // Preferences
+  @state() uiStyle: 'reversx' | 'modern' = 'reversx';
+  @state() uiStyleLabel: string = 'ReversX (Default)';
+  @state() uiAnimation: 'on' | 'off' = 'on';
+  @state() uiAnimationLabel: string = 'ON';
   @state() appFont: string = '"Segoe UI", "Tahoma", "Geneva", "Verdana", sans-serif';
   @state() appFontLabel: string = "Segoe UI (Default)";
   @state() terminalFont: string = "'JetBrains Mono', monospace";
@@ -63,6 +62,8 @@ export class PtyApp extends LitElement {
   @state() commandQuery: string = '';
   @state() recentCommandIds: string[] = [];
   
+  @state() isStatusBarVisible: boolean = true;
+
   // Loading states (5 places)
   @state() isLoading: Record<string, boolean> = {
     terminal: true,
@@ -153,14 +154,7 @@ export class PtyApp extends LitElement {
   private _fgPicker: any = null;
   private _bgPicker: any = null;
 
-  // Touch gesture tracker variables
-  private touchStartX: number = 0;
-  private touchStartY: number = 0;
-  private touchStartTime: number = 0;
-  private isTwoFinger: boolean = false;
-  private initialTwoFingerY: number = 0;
-  private initialTwoFingerX: number = 0;
-  private twoFingerTriggered: boolean = false;
+
 
   private themes: Record<string, any> = {
     'default': { background: '#1e1e1e', foreground: '#cccccc', cursor: '#aeafad' },
@@ -252,6 +246,11 @@ export class PtyApp extends LitElement {
     { value: "pulse-glow", label: "Terminal Pulse Glow" }
   ];
 
+  private uiAnimationsList = [
+    { value: "on", label: "ON" },
+    { value: "off", label: "OFF" }
+  ];
+
   private cursorStylesList = [
     { value: "block", label: "Blinking Block" },
     { value: "block-solid", label: "Solid Block" },
@@ -259,6 +258,10 @@ export class PtyApp extends LitElement {
     { value: "underline-solid", label: "Solid Underline" },
     { value: "bar", label: "Blinking Bar" },
     { value: "bar-solid", label: "Solid Bar" }
+  ];
+
+  private uiStylesList = [
+    { value: 'reversx', label: 'ReversX (Default)' }
   ];
 
   async connectedCallback() {
@@ -272,34 +275,9 @@ export class PtyApp extends LitElement {
     
     await this.loadPreferences();
     
-    // Native keyboard tweaks
-    document.addEventListener('deviceready', () => {
-      if (window.Keyboard) {
-        if (window.Keyboard.hideFormAccessoryBar) {
-          window.Keyboard.hideFormAccessoryBar(true);
-        }
-        if (window.Keyboard.disableScrollingInShrinkView) {
-          window.Keyboard.disableScrollingInShrinkView(true);
-        }
-      }
-      
-      // Native fix for focus and suggestions
-      if (window.NativeKeyboardFix) {
-        window.NativeKeyboardFix.initialize(
-          (msg: string) => console.log(msg),
-          (err: string) => console.error(err)
-        );
-        window.NativeKeyboardFix.disableSuggestions(
-          (msg: string) => console.log(msg),
-          (err: string) => console.error(err)
-        );
-      }
-    }, false);
-    
     const recentCmds = await get('ssh_recent_commands');
     this.recentCommandIds = JSON.parse(recentCmds || '[]');
     
-    this.initSwipeGestures();
     this.initBatteryIndicator();
 
     window.addEventListener('click', (e) => {
@@ -363,6 +341,8 @@ export class PtyApp extends LitElement {
     this.tryAttachSession();
     this.initColorPickers();
     document.documentElement.style.setProperty('--font-ui', this.appFont);
+
+    this.isStatusBarVisible = true;
   }
 
   private initTerminal() {
@@ -387,7 +367,6 @@ export class PtyApp extends LitElement {
       convertEol: true,
       allowProposedApi: true,
       drawBoldTextInBrightColors: true,
-      screenReaderMode: true,
       theme: customTheme,
       fontSize: this.terminalFontSize,
       fontFamily: this.terminalFont,
@@ -405,7 +384,6 @@ export class PtyApp extends LitElement {
     this.term.loadAddon(this.searchAddon);
 
     this.term.open(terminalDiv);
-    this.setupTerminalInputFix();
     this.initDraggableSearchBar();
 
     const viewport = terminalDiv.querySelector('.xterm-viewport') as HTMLElement;
@@ -426,31 +404,27 @@ export class PtyApp extends LitElement {
       this.resetToolbarTimer();
       let sendData = data;
 
-      // Handle CTRL combinations (support both single chars and potential multi-byte from IME)
-      if (this.ctrlActive && data.length > 0) {
-        const firstChar = data[0].toLowerCase();
-        if (firstChar >= 'a' && firstChar <= 'z') {
-          sendData = String.fromCharCode(firstChar.charCodeAt(0) - 96);
-          // If there's more data after the first char, append it (though usually onData is single char for keyboard)
-          if (data.length > 1) sendData += data.substring(1);
-        } else if (firstChar === ' ') {
+      if (this.ctrlActive && data.length === 1) {
+        const char = data.toLowerCase();
+        if (char >= 'a' && char <= 'z') {
+          sendData = String.fromCharCode(char.charCodeAt(0) - 96);
+        } else if (char === ' ') {
           sendData = '\x00';
-        } else if (firstChar === '[') {
+        } else if (char === '[') {
           sendData = '\x1b';
-        } else if (firstChar === '\\') {
+        } else if (char === '\\') {
           sendData = '\x1c';
-        } else if (firstChar === ']') {
+        } else if (char === ']') {
           sendData = '\x1d';
-        } else if (firstChar === '^') {
+        } else if (char === '^') {
           sendData = '\x1e';
-        } else if (firstChar === '_') {
+        } else if (char === '_') {
           sendData = '\x1f';
         }
         this.ctrlActive = false;
       }
 
-      // Handle ALT combinations
-      if (this.altActive && sendData.length > 0) {
+      if (this.altActive && sendData.length === 1) {
         sendData = '\x1b' + sendData;
         this.altActive = false;
       }
@@ -459,10 +433,6 @@ export class PtyApp extends LitElement {
         this.ws.send(JSON.stringify({ type: 'input', data: sendData }));
       }
     });
-
-    // Persistent textarea configuration
-    this.term.onRender(() => this.configureTerminalTextarea());
-    this.term.textarea?.addEventListener('focus', () => this.configureTerminalTextarea());
 
     if (document.fonts) {
       document.fonts.ready.then(() => {
@@ -501,31 +471,6 @@ export class PtyApp extends LitElement {
 
     // Apply word wrap styling
     this.applyWordWrapToDOM();
-  }
-
-  private setupTerminalInputFix() {
-    this.configureTerminalTextarea();
-    
-    // Set up a mutation observer to keep attributes synced if xterm.js modifies them
-    if (this.term.textarea) {
-      const observer = new MutationObserver(() => this.configureTerminalTextarea());
-      observer.observe(this.term.textarea, { attributes: true });
-    }
-  }
-
-  private configureTerminalTextarea() {
-    const textarea = this.term.textarea;
-    if (textarea) {
-      // Disabling all native mobile assistance
-      textarea.setAttribute('autocorrect', 'off');
-      textarea.setAttribute('autocapitalize', 'none');
-      textarea.setAttribute('spellcheck', 'false');
-      textarea.setAttribute('autocomplete', 'off');
-      
-      // Use "email" to more aggressively disable Gboard suggestions/autocorrect
-      textarea.setAttribute('inputmode', 'email');
-      textarea.setAttribute('enterkeyhint', 'enter');
-    }
   }
 
   private defaultMacros = [
@@ -579,6 +524,7 @@ export class PtyApp extends LitElement {
         if (data.host) this.host = data.host;
         if (data.port) this.port = data.port;
         if (data.user) this.user = data.user;
+        if (data.wsBridgeUrl) this.wsBridgeUrl = data.wsBridgeUrl;
         
         if (data.appFont) {
           this.appFont = data.appFont;
@@ -631,10 +577,27 @@ export class PtyApp extends LitElement {
         } else if (data.terminalTheme && this.themes[data.terminalTheme]) {
           this.terminalCustomBg = this.themes[data.terminalTheme].background;
         }
+
+        if (data.uiStyle) {
+          this.uiStyle = data.uiStyle;
+          const found = this.uiStylesList.find(s => s.value === data.uiStyle);
+          if (found) this.uiStyleLabel = found.label;
+        }
+
+        if (data.uiAnimation) {
+          this.uiAnimation = data.uiAnimation;
+          const found = this.uiAnimationsList.find(a => a.value === data.uiAnimation);
+          if (found) this.uiAnimationLabel = found.label;
+          this.applyUiAnimationToDOM();
+        }
       } catch (e) {
         console.error("Failed parsing preferences", e);
       }
     }
+  }
+
+  private applyUiAnimationToDOM() {
+    document.body.classList.toggle('no-animations', this.uiAnimation === 'off');
   }
 
   private applyThemeToBody(themeId: string) {
@@ -683,6 +646,8 @@ export class PtyApp extends LitElement {
       this.themeDropdownActive = false;
       this.animationDropdownActive = false;
       this.cursorStyleDropdownActive = false;
+      this.uiStyleDropdownActive = false;
+      this.uiAnimationDropdownActive = false;
     }
   };
 
@@ -732,8 +697,18 @@ export class PtyApp extends LitElement {
     if (this.ws) {
       this.ws.close();
     }
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    this.ws = new WebSocket(`${proto}//${location.host}`);
+    let url = '';
+    if (this.wsBridgeUrl && this.wsBridgeUrl.trim()) {
+      url = this.wsBridgeUrl.trim();
+    } else {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      if (location.protocol === 'file:') {
+        url = 'ws://127.0.0.1:3000';
+      } else {
+        url = `${proto}//${location.host}`;
+      }
+    }
+    this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
       this.updateUIStatus('WS_OPEN', 'online');
@@ -863,6 +838,8 @@ export class PtyApp extends LitElement {
     this.themeDropdownActive = false;
     this.animationDropdownActive = false;
     this.cursorStyleDropdownActive = false;
+    this.uiStyleDropdownActive = false;
+    this.uiAnimationDropdownActive = false;
     this.appFontDropdownActive = !this.appFontDropdownActive;
   }
 
@@ -880,6 +857,8 @@ export class PtyApp extends LitElement {
     this.themeDropdownActive = false;
     this.animationDropdownActive = false;
     this.cursorStyleDropdownActive = false;
+    this.uiStyleDropdownActive = false;
+    this.uiAnimationDropdownActive = false;
     this.fontDropdownActive = !this.fontDropdownActive;
   }
 
@@ -901,6 +880,8 @@ export class PtyApp extends LitElement {
     this.fontDropdownActive = false;
     this.animationDropdownActive = false;
     this.cursorStyleDropdownActive = false;
+    this.uiStyleDropdownActive = false;
+    this.uiAnimationDropdownActive = false;
     this.themeDropdownActive = !this.themeDropdownActive;
   }
 
@@ -1017,6 +998,8 @@ export class PtyApp extends LitElement {
     this.fontDropdownActive = false;
     this.themeDropdownActive = false;
     this.cursorStyleDropdownActive = false;
+    this.uiStyleDropdownActive = false;
+    this.uiAnimationDropdownActive = false;
     this.animationDropdownActive = !this.animationDropdownActive;
   }
 
@@ -1034,6 +1017,8 @@ export class PtyApp extends LitElement {
     this.fontDropdownActive = false;
     this.themeDropdownActive = false;
     this.animationDropdownActive = false;
+    this.uiStyleDropdownActive = false;
+    this.uiAnimationDropdownActive = false;
     this.cursorStyleDropdownActive = !this.cursorStyleDropdownActive;
   }
 
@@ -1049,6 +1034,44 @@ export class PtyApp extends LitElement {
       this.term.options.cursorBlink = isBlinking;
     }
 
+    this.savePrefs();
+  }
+
+  toggleUiStyleDropdown(e: MouseEvent) {
+    e.stopPropagation();
+    this.appFontDropdownActive = false;
+    this.fontDropdownActive = false;
+    this.themeDropdownActive = false;
+    this.animationDropdownActive = false;
+    this.cursorStyleDropdownActive = false;
+    this.uiAnimationDropdownActive = false;
+    this.uiStyleDropdownActive = !this.uiStyleDropdownActive;
+  }
+
+  selectUiStyleOption(value: 'reversx' | 'modern', label: string) {
+    this.uiStyle = value;
+    this.uiStyleLabel = label;
+    this.uiStyleDropdownActive = false;
+    this.isStatusBarVisible = true;
+    this.savePrefs();
+  }
+
+  toggleUiAnimationDropdown(e: MouseEvent) {
+    e.stopPropagation();
+    this.appFontDropdownActive = false;
+    this.fontDropdownActive = false;
+    this.themeDropdownActive = false;
+    this.animationDropdownActive = false;
+    this.cursorStyleDropdownActive = false;
+    this.uiStyleDropdownActive = false;
+    this.uiAnimationDropdownActive = !this.uiAnimationDropdownActive;
+  }
+
+  selectUiAnimationOption(value: 'on' | 'off', label: string) {
+    this.uiAnimation = value;
+    this.uiAnimationLabel = label;
+    this.uiAnimationDropdownActive = false;
+    this.applyUiAnimationToDOM();
     this.savePrefs();
   }
 
@@ -1073,7 +1096,10 @@ export class PtyApp extends LitElement {
       terminalCursorStyle: this.terminalCursorStyle,
       terminalCustomFg: this.terminalCustomFg,
       terminalCustomBg: this.terminalCustomBg,
-      wordWrap: this.wordWrap
+      wordWrap: this.wordWrap,
+      uiStyle: this.uiStyle,
+      uiAnimation: this.uiAnimation,
+      wsBridgeUrl: this.wsBridgeUrl
     }));
   }
 
@@ -1473,92 +1499,6 @@ export class PtyApp extends LitElement {
     if (this.searchValue) this.searchAddon.findNext(this.searchValue, this.getSearchOptions(true));
   };
 
-  private handleToolbarPointerDown(e: UIEvent, key: string) {
-    if (e.cancelable) e.preventDefault();
-    e.stopPropagation();
-    this.sendToolbarKey(key);
-    // Immediate and repeated focus to ensure keyboard stability
-    if (this.term) {
-      this.term.focus();
-      this.configureTerminalTextarea();
-    }
-    setTimeout(() => {
-      if (this.term) {
-        this.term.focus();
-        this.configureTerminalTextarea();
-        if (window.NativeKeyboardFix) {
-          window.NativeKeyboardFix.disableSuggestions(() => {}, () => {});
-        }
-      }
-    }, 10);
-  }
-
-  private handleToolbarTogglePointerDown(e: UIEvent) {
-    if (e.cancelable) e.preventDefault();
-    e.stopPropagation();
-    this.toolbarVisible = !this.toolbarVisible;
-    if (this.term) {
-      this.term.focus();
-      this.configureTerminalTextarea();
-    }
-    setTimeout(() => {
-      if (this.term) {
-        this.term.focus();
-        this.configureTerminalTextarea();
-        if (window.NativeKeyboardFix) {
-          window.NativeKeyboardFix.disableSuggestions(() => {}, () => {});
-        }
-      }
-    }, 10);
-  }
-
-  private handleCtrlAltTogglePointerDown(e: UIEvent, type: 'ctrl' | 'alt') {
-    if (e.cancelable) e.preventDefault();
-    e.stopPropagation();
-    if (type === 'ctrl') {
-      this.ctrlActive = !this.ctrlActive;
-    } else {
-      this.altActive = !this.altActive;
-    }
-    if (this.term) {
-      this.term.focus();
-      this.configureTerminalTextarea();
-    }
-    setTimeout(() => {
-      if (this.term) {
-        this.term.focus();
-        this.configureTerminalTextarea();
-        if (window.NativeKeyboardFix) {
-          window.NativeKeyboardFix.disableSuggestions(() => {}, () => {});
-        }
-      }
-    }, 10);
-  }
-
-  private handleMenuPointerDown(e: UIEvent) {
-    if (e.cancelable) e.preventDefault();
-    e.stopPropagation();
-    this.togglePalette();
-    // If we're closing, return focus to terminal
-    if (this.palettePopupActive) {
-      setTimeout(() => {
-        const input = document.getElementById('palette-search');
-        if (input) input.focus();
-      }, 50);
-    } else {
-      if (this.term) {
-        this.term.focus();
-        this.configureTerminalTextarea();
-      }
-      setTimeout(() => {
-        if (this.term) {
-          this.term.focus();
-          this.configureTerminalTextarea();
-        }
-      }, 10);
-    }
-  }
-
   sendCmd = (cmd: string) => {
     if (this.ws?.readyState === 1) {
       this.ws.send(JSON.stringify({ type: 'input', data: cmd }));
@@ -1579,8 +1519,6 @@ export class PtyApp extends LitElement {
     else if (key === 'DOWN') code = '\x1b[B';
     else if (key === 'LEFT') code = '\x1b[D';
     else if (key === 'RIGHT') code = '\x1b[C';
-    else if (key === 'PGUP') code = '\x1b[5~';
-    else if (key === 'PGDN') code = '\x1b[6~';
 
     if (this.ctrlActive && code.length === 1) {
       const char = code.toLowerCase();
@@ -1669,10 +1607,6 @@ export class PtyApp extends LitElement {
       }, 50);
     } else {
       this.paletteSearchValue = '';
-      setTimeout(() => {
-        this.term?.focus();
-        this.configureTerminalTextarea();
-      }, 50);
     }
   }
 
@@ -1690,24 +1624,10 @@ export class PtyApp extends LitElement {
   }
 
   handlePaletteCommand(action: Function) {
-    const isSearch = action.toString().includes('openSearch') || action.toString().includes('Search');
     action();
     this.palettePopupActive = false;
     this.paletteSearchValue = '';
     this.handleItemPointerUp();
-    
-    if (!isSearch) {
-      if (this.term) {
-        this.term.focus();
-        this.configureTerminalTextarea();
-      }
-      setTimeout(() => {
-        if (this.term) {
-          this.term.focus();
-          this.configureTerminalTextarea();
-        }
-      }, 50);
-    }
   }
 
   isAndroid() {
@@ -1907,80 +1827,7 @@ export class PtyApp extends LitElement {
     }
   }
 
-  private initSwipeGestures() {
-    const tabsList = ['setup', 'terminal', 'documentation'];
 
-    const onTouchStart = (e: TouchEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('input, button, select, textarea, #search-bar, .custom-select')) {
-        return;
-      }
-
-      if (e.touches.length === 2) {
-        this.isTwoFinger = true;
-        this.twoFingerTriggered = false;
-        this.initialTwoFingerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        this.initialTwoFingerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      } else if (e.touches.length === 1) {
-        this.isTwoFinger = false;
-        this.touchStartX = e.touches[0].clientX;
-        this.touchStartY = e.touches[0].clientY;
-        this.touchStartTime = Date.now();
-      }
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (this.isTwoFinger && e.touches.length === 2 && !this.twoFingerTriggered) {
-        const currentY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        const currentX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        const deltaY = currentY - this.initialTwoFingerY;
-        const deltaX = currentX - this.initialTwoFingerX;
-
-        if (deltaY > 40 && Math.abs(deltaY) > Math.abs(deltaX) * 1.2) {
-          this.twoFingerTriggered = true;
-          const statusBar = this.querySelector('.status-bar') as HTMLElement;
-          if (statusBar) {
-            statusBar.style.display = 'flex';
-            this.triggerManualResize();
-          }
-        }
-      }
-    };
-
-    const onTouchEnd = (e: TouchEvent) => {
-      if (this.isTwoFinger) {
-        this.isTwoFinger = false;
-        return;
-      }
-
-      if (!e.changedTouches || e.changedTouches.length !== 1) return;
-
-      const touchEndX = e.changedTouches[0].clientX;
-      const touchEndY = e.changedTouches[0].clientY;
-      const duration = Date.now() - this.touchStartTime;
-
-      const deltaX = touchEndX - this.touchStartX;
-      const deltaY = touchEndY - this.touchStartY;
-
-      if (duration < 600 && Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY) * 1.4) {
-        const currentIndex = tabsList.indexOf(this.activeTab);
-
-        if (deltaX < -50) {
-          if (currentIndex < tabsList.length - 1) {
-            this.setView(tabsList[currentIndex + 1]);
-          }
-        } else if (deltaX > 50) {
-          if (currentIndex > 0) {
-            this.setView(tabsList[currentIndex - 1]);
-          }
-        }
-      }
-    };
-
-    window.addEventListener('touchstart', onTouchStart, { passive: true });
-    window.addEventListener('touchmove', onTouchMove, { passive: true });
-    window.addEventListener('touchend', onTouchEnd, { passive: true });
-  }
 
   private getAnimationClass() {
     if (this.terminalAnimation === 'fade-in') {
@@ -2005,17 +1852,38 @@ export class PtyApp extends LitElement {
 
   render() {
     return html`
-      <div class="activity-bar">
-        <div class="tab ${this.activeTab === 'welcome' ? 'active' : ''}" @click="${() => this.setView('welcome')}">Welcome</div>
-        <div class="tab ${this.activeTab === 'setup' ? 'active' : ''}" @click="${() => this.setView('setup')}">Config</div>
-        <div class="tab ${this.activeTab === 'terminal' ? 'active' : ''}" @click="${() => this.setView('terminal')}">Terminal</div>
-        <div class="tab ${this.activeTab === 'documentation' ? 'active' : ''}" @click="${() => this.setView('documentation')}">Documentation</div>
-      </div>
+      <div class="app-root ${this.uiStyle}-style">
+        <div class="activity-bar">
+          <div class="tab ${this.activeTab === 'welcome' ? 'active' : ''}" @click="${() => this.setView('welcome')}">
+            <div class="tab-icon-container">
+              <span class="codicon codicon-home"></span>
+            </div>
+            <span class="tab-label">Welcome</span>
+          </div>
+          <div class="tab ${this.activeTab === 'setup' ? 'active' : ''}" @click="${() => this.setView('setup')}">
+            <div class="tab-icon-container">
+              <span class="codicon codicon-settings-gear"></span>
+            </div>
+            <span class="tab-label">Config</span>
+          </div>
+          <div class="tab ${this.activeTab === 'terminal' ? 'active' : ''}" @click="${() => this.setView('terminal')}">
+            <div class="tab-icon-container">
+              <span class="codicon codicon-terminal"></span>
+            </div>
+            <span class="tab-label">Terminal</span>
+          </div>
+          <div class="tab ${this.activeTab === 'documentation' ? 'active' : ''}" @click="${() => this.setView('documentation')}">
+            <div class="tab-icon-container">
+              <span class="codicon codicon-book"></span>
+            </div>
+            <span class="tab-label">Documentation</span>
+          </div>
+        </div>
 
       <!-- Welcome View -->
       <div id="welcome-view" class="view ${this.activeTab === 'welcome' ? 'active' : ''}">
         <div class="welcome-pane">
-          <h1>Welcome to ReversX PTY Terminal</h1>
+          <h1>ReversX PTY Terminal</h1>
           <div class="welcome-grid">
             <div class="welcome-section">
               <h3>Start</h3>
@@ -2078,6 +1946,12 @@ export class PtyApp extends LitElement {
             </div>
 
             <div class="field">
+              <label>WebSocket Bridge URL</label>
+              <div class="description">Required for Cordova/Termux local connection (e.g., <code>ws://127.0.0.1:3000</code>). Leave blank to auto-detect on web.</div>
+              <input type="text" id="ws-bridge-url" placeholder="ws://127.0.0.1:3000" .value="${this.wsBridgeUrl}" @input="${(e: any) => { this.wsBridgeUrl = e.target.value; this.savePrefs(); }}" data-tooltip="Enter custom WebSocket bridge URL">
+            </div>
+
+            <div class="field">
               <label>App Font</label>
               <div class="description">Select the font family for the application UI.</div>
               <div class="custom-select" id="app-font-custom-select" data-tooltip="Select application font">
@@ -2106,7 +1980,24 @@ export class PtyApp extends LitElement {
             <div class="field">
               <label>Terminal Font Size (${this.terminalFontSize}px)</label>
               <div class="description">Smoothly adjust the terminal font size.</div>
-              <input type="range" min="10" max="30" step="1" .value="${this.terminalFontSize}" @input="${this.handleFontSizeChange}" data-tooltip="Adjust terminal font size">
+              <div class="android-font-slider">
+                <span class="font-icon small">A</span>
+                <input type="range" min="10" max="30" step="1" .value="${this.terminalFontSize}" @input="${this.handleFontSizeChange}" data-tooltip="Adjust terminal font size">
+                <span class="font-icon large">A</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>UI Style</label>
+              <div class="description">Select the visual appearance of the application.</div>
+              <div class="custom-select" id="ui-style-custom-select" data-tooltip="Select UI Style">
+                <div class="select-trigger" @click="${this.toggleUiStyleDropdown}">${this.uiStyleLabel}</div>
+                <div class="select-options ${this.uiStyleDropdownActive ? 'active' : ''}" id="ui-style-options-list">
+                  ${this.uiStylesList.map(style => html`
+                    <div class="select-option ${this.uiStyle === style.value ? 'selected' : ''}" @click="${() => this.selectUiStyleOption(style.value as 'reversx' | 'modern', style.label)}">${style.label}</div>
+                  `)}
+                </div>
+              </div>
             </div>
 
             <div class="field">
@@ -2173,6 +2064,19 @@ export class PtyApp extends LitElement {
                 <div class="select-options ${this.animationDropdownActive ? 'active' : ''}" id="animation-options-list">
                   ${this.animationsList.map(anim => html`
                     <div class="select-option ${this.terminalAnimation === anim.value ? 'selected' : ''}" @click="${() => this.selectAnimationOption(anim.value, anim.label)}">${anim.label}</div>
+                  `)}
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>UI Animation</label>
+              <div class="description">Enable or disable transition animations across the user interface. Set to OFF for instant, fast transitions.</div>
+              <div class="custom-select" id="ui-animation-custom-select">
+                <div class="select-trigger" @click="${this.toggleUiAnimationDropdown}">${this.uiAnimationLabel}</div>
+                <div class="select-options ${this.uiAnimationDropdownActive ? 'active' : ''}" id="ui-animation-options-list">
+                  ${this.uiAnimationsList.map(anim => html`
+                    <div class="select-option ${this.uiAnimation === anim.value ? 'selected' : ''}" @click="${() => this.selectUiAnimationOption(anim.value, anim.label)}">${anim.label}</div>
                   `)}
                 </div>
               </div>
@@ -2282,6 +2186,25 @@ export class PtyApp extends LitElement {
               <b>Auto-Resume:</b> We save your session token locally. If you refresh or close the tab, we will try to reconnect automatically!
             </div>
           </div>
+        </div>
+        
+        <div class="status-bar ${this.isLoading.statusbar ? 'skeleton' : ''}">
+          <div id="status-dot" class="status-dot ${this.statusType}"></div>
+          <span id="label-status" style="margin-left: 6px;">${this.status}</span>
+          <span style="margin-left: 15px;" id="label-info">${this.labelInfo}</span>
+          <span style="margin-left: 15px; display: inline-flex; align-items: center; gap: 4px; ${this.getBatteryStyle()}" id="battery-indicator" title="Battery Status">
+            <span id="battery-level">${this.batteryLevel}</span>
+          </span>
+          <span style="margin-left: 15px; display: inline-flex; align-items: center; gap: 4px;" id="ping-indicator" title="Network Latency (RTT)">
+            <span id="ping-time">${this.latency !== null ? `${this.latency}ms` : '--'}</span>
+          </span>
+          <span style="margin-left: 15px; display: inline-flex; align-items: center; gap: 4px;" title="Network Throughput">
+            ${this.throughput.toFixed(1)} KB/s
+          </span>
+          <span style="margin-left: 15px; display: inline-flex; align-items: center; gap: 4px;" title="Session Uptime">
+            ${this.sessionUptime}
+          </span>
+          <span style="margin-left: auto; color: rgba(255,255,255,0.7);" id="label-dims">${this.dimsText}</span>
         </div>
       </div>
 
@@ -2456,12 +2379,11 @@ export class PtyApp extends LitElement {
               <span class="codicon codicon-chevron-down"></span> Scroll to bottom
             </button>
           ` : ''}
+
         </div>
         
-        <button class="toolbar-toggle-btn" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarTogglePointerDown(e)}" title="${this.toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}">
-          <span class="material-symbols-rounded">
-            ${this.toolbarVisible ? 'keyboard_arrow_down' : 'keyboard_arrow_up'}
-          </span>
+        <button class="toolbar-toggle-btn" @click="${() => this.toolbarVisible = !this.toolbarVisible}" title="${this.toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}">
+          <span class="codicon ${this.toolbarVisible ? 'codicon-chevron-down' : 'codicon-chevron-up'}"></span>
         </button>
 
         <div class="vs-toolbar" style="display: ${this.toolbarVisible ? 'flex' : 'none'}">
@@ -2473,10 +2395,9 @@ export class PtyApp extends LitElement {
             <div class="popup-items-list" id="popup-list">
               ${this.getFilteredPaletteCommands().map(cmd => html`
                 <div class="popup-item" 
-                  tabindex="-1"
-                  @pointerdown="${(e: PointerEvent) => { e.preventDefault(); this.handleItemPointerDown(e, cmd.label, (cmd as any).desc || ''); this.handlePaletteCommand(cmd.action); }}"
-                  @pointerup="${this.handleItemPointerUp}"
-                  @pointerleave="${this.handleItemPointerUp}">
+                  @click="${() => this.handlePaletteCommand(cmd.action)}"
+                  @pointerdown="${(e: PointerEvent) => this.handleItemPointerDown(e, cmd.label, (cmd as any).desc || '')}"
+                  @pointerup="${this.handleItemPointerUp}">
                   <span class="popup-label">${cmd.label}</span>
                   <span class="popup-shortcut">${cmd.shortcut}</span>
                 </div>
@@ -2486,54 +2407,25 @@ export class PtyApp extends LitElement {
 
           <!-- Row 1 -->
           <div class="toolbar-row">
-            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'ESC')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'ESC')}">ESC</button>
-            <button class="key" tabindex="-1" id="menu-btn" @pointerdown="${(e: UIEvent) => this.handleMenuPointerDown(e)}" @touchstart="${(e: UIEvent) => this.handleMenuPointerDown(e)}"><i class="fa-solid fa-bars"></i></button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarTogglePointerDown(e)}" @touchstart="${(e: UIEvent) => this.handleToolbarTogglePointerDown(e)}"><i class="fa-solid fa-arrows-up-down"></i></button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'HOME')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'HOME')}">HOME</button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'UP')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'UP')}"><i class="fa-solid fa-arrow-up"></i></button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'END')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'END')}">END</button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'PGUP')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'PGUP')}">PGUP</button>
+            <button class="key" @click="${() => this.sendToolbarKey('ESC')}">ESC</button>
+            <button class="key" id="menu-btn" @click="${this.togglePalette}"><i class="fa-solid fa-bars"></i></button>
+            <button class="key" @click="${() => this.toolbarVisible = !this.toolbarVisible}"><i class="fa-solid fa-arrows-up-down"></i></button>
+            <button class="key" @click="${() => this.sendToolbarKey('HOME')}">HOME</button>
+            <button class="key" @click="${() => this.sendToolbarKey('UP')}"><i class="fa-solid fa-arrow-up"></i></button>
+            <button class="key" @click="${() => this.sendToolbarKey('END')}">END</button>
+            <button class="key" @click="${() => this.sendCmd('\x1b[5~')}">PGUP</button>
           </div>
 
           <!-- Row 2 -->
           <div class="toolbar-row">
-            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'TAB')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'TAB')}"><i class="fa-solid fa-indent"></i></button>
-            <button class="key ${this.ctrlActive ? 'active' : ''}" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleCtrlAltTogglePointerDown(e, 'ctrl')}" @touchstart="${(e: UIEvent) => this.handleCtrlAltTogglePointerDown(e, 'ctrl')}">CTRL</button>
-            <button class="key ${this.altActive ? 'active' : ''}" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleCtrlAltTogglePointerDown(e, 'alt')}" @touchstart="${(e: UIEvent) => this.handleCtrlAltTogglePointerDown(e, 'alt')}">ALT</button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'LEFT')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'LEFT')}"><i class="fa-solid fa-arrow-left"></i></button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'DOWN')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'DOWN')}"><i class="fa-solid fa-arrow-down"></i></button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'RIGHT')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'RIGHT')}"><i class="fa-solid fa-arrow-right"></i></button>
-            <button class="key" tabindex="-1" @pointerdown="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'PGDN')}" @touchstart="${(e: UIEvent) => this.handleToolbarPointerDown(e, 'PGDN')}">PGDN</button>
+            <button class="key" @click="${() => this.sendToolbarKey('TAB')}"><i class="fa-solid fa-indent"></i></button>
+            <button class="key ${this.ctrlActive ? 'active' : ''}" @click="${() => this.ctrlActive = !this.ctrlActive}">CTRL</button>
+            <button class="key ${this.altActive ? 'active' : ''}" @click="${() => this.altActive = !this.altActive}">ALT</button>
+            <button class="key" @click="${() => this.sendToolbarKey('LEFT')}"><i class="fa-solid fa-arrow-left"></i></button>
+            <button class="key" @click="${() => this.sendToolbarKey('DOWN')}"><i class="fa-solid fa-arrow-down"></i></button>
+            <button class="key" @click="${() => this.sendToolbarKey('RIGHT')}"><i class="fa-solid fa-arrow-right"></i></button>
+            <button class="key" @click="${() => this.sendCmd('\x1b[6~')}">PGDN</button>
           </div>
-        </div>
-        
-        <div class="toolbar-toggle-floating" style="display: ${this.toolbarVisible ? 'none' : 'flex'}">
-          <button class="toolbar-toggle-btn" tabindex="-1" @pointerdown="${(e: PointerEvent) => this.handleToolbarTogglePointerDown(e)}">
-            <span class="codicon codicon-chevron-up" style="font-size: 16px;"></span>
-          </button>
-        </div>
-
-        <div class="status-bar ${this.isLoading.statusbar ? 'skeleton' : ''}">
-          <div id="status-dot" class="status-dot ${this.statusType}"></div>
-          <span class="codicon codicon-gear" style="margin-right: 4px;"></span> <span id="label-status">${this.status}</span>
-          <span style="margin-left: 15px;" id="label-info">${this.labelInfo}</span>
-          <span style="margin-left: 15px; display: inline-flex; align-items: center; gap: 4px; ${this.getBatteryStyle()}" id="battery-indicator" title="Battery Status">
-            <span id="battery-icon">${this.batteryIcon}</span>
-            <span id="battery-level">${this.batteryLevel}</span>
-          </span>
-          <span style="margin-left: 15px; display: inline-flex; align-items: center; gap: 4px;" id="ping-indicator" title="Network Latency (RTT)">
-            <span class="codicon codicon-zap"></span>
-            <span id="ping-time">${this.latency !== null ? `${this.latency}ms` : '--'}</span>
-          </span>
-          <span style="margin-left: 15px; display: inline-flex; align-items: center; gap: 4px;" title="Network Throughput">
-            <span class="codicon codicon-graph"></span>
-            ${this.throughput.toFixed(1)} KB/s
-          </span>
-          <span style="margin-left: 15px; display: inline-flex; align-items: center; gap: 4px;" title="Session Uptime">
-            <span class="codicon codicon-watch"></span>
-            ${this.sessionUptime}
-          </span>
-          <span style="margin-left: auto; color: rgba(255,255,255,0.7);" id="label-dims">${this.dimsText}</span>
         </div>
       </div>
       
@@ -2578,6 +2470,7 @@ export class PtyApp extends LitElement {
           </div>
         </div>
       ` : ''}
+      </div>
     `;
   }
 }
