@@ -1682,12 +1682,15 @@ export class PtyApp extends LitElement {
     this.resetToolbarTimer();
   }
 
+  preventKeyBlur(e: Event) {
+    e.preventDefault();
+    this.term?.focus?.();
+  }
+
   resetToolbarTimer() {
     this.toolbarVisible = true;
     if (this.toolbarHideTimer) clearTimeout(this.toolbarHideTimer);
-    this.toolbarHideTimer = setTimeout(() => {
-      this.toolbarVisible = false;
-    }, 5000);
+    // Auto-hide is completely disabled to keep the toolbar visible permanently
   }
 
   getPaletteCommands() {
@@ -1765,47 +1768,7 @@ export class PtyApp extends LitElement {
   }
 
   handleItemPointerDown(e: PointerEvent, label: string, desc: string) {
-    if (this.tooltipTimer) clearTimeout(this.tooltipTimer);
-    
-    // Capture necessary context before the timeout
-    const target = e.currentTarget as HTMLElement;
-    const fallbackX = e.clientX;
-    const fallbackY = e.clientY - 60;
-
-    this.tooltipTimer = setTimeout(async () => {
-      this.tooltipText = desc || `Command: ${label}. Tap to execute or click × to dismiss.`;
-      
-      // Start with a reasonable fallback position near the touch point
-      // to avoid the "off-screen" flash if positioning takes a moment
-      this.tooltipX = Math.max(10, Math.min(fallbackX - 100, window.innerWidth - 250));
-      this.tooltipY = Math.max(10, fallbackY);
-      
-      this.tooltipVisible = true;
-      
-      // Wait for rendering to complete so we can measure the tooltip
-      await this.updateComplete;
-      
-      const tooltip = this.shadowRoot?.querySelector('.vscode-tooltip') as HTMLElement;
-      if (tooltip && target) {
-        try {
-          const {x, y} = await computePosition(target, tooltip, {
-            placement: 'top',
-            strategy: 'fixed',
-            middleware: [
-              offset(12),
-              flip(),
-              shift({padding: 10})
-            ],
-          });
-          
-          this.tooltipX = x;
-          this.tooltipY = y;
-          this.requestUpdate();
-        } catch (err) {
-          console.warn('Floating UI failed, using fallback:', err);
-        }
-      }
-    }, 900);
+    // Tooltips are completely disabled to prevent floating popups on screen
   }
 
   handleItemPointerUp() {
@@ -2729,7 +2692,7 @@ export class PtyApp extends LitElement {
 
         </div>
         
-        <button class="toolbar-toggle-btn" @click="${() => this.toolbarVisible = !this.toolbarVisible}" title="${this.toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}">
+        <button class="toolbar-toggle-btn" @click="${() => this.toolbarVisible = !this.toolbarVisible}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}" title="${this.toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}">
           ${this.renderHeroicon(this.toolbarVisible ? 'chevron-down' : 'chevron-up', '', 16)}
         </button>
 
@@ -2743,8 +2706,8 @@ export class PtyApp extends LitElement {
               ${this.getFilteredPaletteCommands().map(cmd => html`
                 <div class="popup-item" 
                   @click="${() => this.handlePaletteCommand(cmd.action)}"
-                  @pointerdown="${(e: PointerEvent) => this.handleItemPointerDown(e, cmd.label, (cmd as any).desc || '')}"
-                  @pointerup="${this.handleItemPointerUp}">
+                  @pointerdown="${this.preventKeyBlur}"
+                  @mousedown="${this.preventKeyBlur}">
                   <span class="popup-label">${cmd.label}</span>
                   <span class="popup-shortcut">${cmd.shortcut}</span>
                 </div>
@@ -2754,24 +2717,24 @@ export class PtyApp extends LitElement {
 
           <!-- Row 1 -->
           <div class="toolbar-row">
-            <button class="key" @click="${() => this.sendToolbarKey('ESC')}">ESC</button>
-            <button class="key" id="menu-btn" @click="${this.togglePalette}">${this.renderHeroicon('bars', '', 14)}</button>
-            <button class="key" @click="${() => this.toolbarVisible = !this.toolbarVisible}">${this.renderHeroicon('arrows-up-down', '', 14)}</button>
-            <button class="key" @click="${() => this.sendToolbarKey('HOME')}">HOME</button>
-            <button class="key" @click="${() => this.sendToolbarKey('UP')}">${this.renderHeroicon('arrow-up', '', 14)}</button>
-            <button class="key" @click="${() => this.sendToolbarKey('END')}">END</button>
-            <button class="key" @click="${() => this.sendCmd('\x1b[5~')}">PGUP</button>
+            <button class="key" @click="${() => this.sendToolbarKey('ESC')}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">ESC</button>
+            <button class="key" id="menu-btn" @click="${this.togglePalette}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">${this.renderHeroicon('bars', '', 14)}</button>
+            <button class="key" @click="${() => this.toolbarVisible = !this.toolbarVisible}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">${this.renderHeroicon('arrows-up-down', '', 14)}</button>
+            <button class="key" @click="${() => this.sendToolbarKey('HOME')}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">HOME</button>
+            <button class="key" @click="${() => this.sendToolbarKey('UP')}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">${this.renderHeroicon('arrow-up', '', 14)}</button>
+            <button class="key" @click="${() => this.sendToolbarKey('END')}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">END</button>
+            <button class="key" @click="${() => this.sendCmd('\x1b[5~')}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">PGUP</button>
           </div>
 
           <!-- Row 2 -->
           <div class="toolbar-row">
-            <button class="key" @click="${() => this.sendToolbarKey('TAB')}">${this.renderHeroicon('indent', '', 14)}</button>
-            <button class="key ${this.ctrlActive ? 'active' : ''}" @click="${() => this.ctrlActive = !this.ctrlActive}">CTRL</button>
-            <button class="key ${this.altActive ? 'active' : ''}" @click="${() => this.altActive = !this.altActive}">ALT</button>
-            <button class="key" @click="${() => this.sendToolbarKey('LEFT')}">${this.renderHeroicon('arrow-left', '', 14)}</button>
-            <button class="key" @click="${() => this.sendToolbarKey('DOWN')}">${this.renderHeroicon('arrow-down', '', 14)}</button>
-            <button class="key" @click="${() => this.sendToolbarKey('RIGHT')}">${this.renderHeroicon('arrow-right', '', 14)}</button>
-            <button class="key" @click="${() => this.sendCmd('\x1b[6~')}">PGDN</button>
+            <button class="key" @click="${() => this.sendToolbarKey('TAB')}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">${this.renderHeroicon('indent', '', 14)}</button>
+            <button class="key ${this.ctrlActive ? 'active' : ''}" @click="${() => this.ctrlActive = !this.ctrlActive}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">CTRL</button>
+            <button class="key ${this.altActive ? 'active' : ''}" @click="${() => this.altActive = !this.altActive}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">ALT</button>
+            <button class="key" @click="${() => this.sendToolbarKey('LEFT')}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">${this.renderHeroicon('arrow-left', '', 14)}</button>
+            <button class="key" @click="${() => this.sendToolbarKey('DOWN')}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">${this.renderHeroicon('arrow-down', '', 14)}</button>
+            <button class="key" @click="${() => this.sendToolbarKey('RIGHT')}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">${this.renderHeroicon('arrow-right', '', 14)}</button>
+            <button class="key" @click="${() => this.sendCmd('\x1b[6~')}" @pointerdown="${this.preventKeyBlur}" @mousedown="${this.preventKeyBlur}">PGDN</button>
           </div>
         </div>
       </div>
