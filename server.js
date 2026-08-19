@@ -334,8 +334,27 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-app.use(express.static(path.join(__dirname, 'www')));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'www', 'index.html')));
+// Disable all browser caching for static files so the latest version is always loaded
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  next();
+});
+
+app.use(express.static(path.join(__dirname, 'www'), {
+  etag: false,
+  lastModified: false
+}));
+
+app.get('*', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  res.sendFile(path.join(__dirname, 'www', 'index.html'));
+});
 
 server.listen(3000, () => {
   console.clear();

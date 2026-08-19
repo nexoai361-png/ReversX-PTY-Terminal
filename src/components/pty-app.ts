@@ -85,10 +85,10 @@ export class PtyApp extends LitElement {
   ];
 
   private commands = [
-    { id: 'clear', label: 'Clear terminal', action: () => this.clearTerminal(), iconClass: 'codicon codicon-clear-all', shortcut: 'Ctrl + L' },
-    { id: 'wordwrap', label: 'Toggle Word Wrap', action: () => this.toggleWordWrap(), iconClass: 'codicon codicon-word-wrap' },
-    { id: 'logs', label: 'Download Logs', action: () => this.downloadLogs(), iconClass: 'codicon codicon-cloud-download' },
-    { id: 'settings', label: 'Go to Settings', action: () => this.setView('setup'), iconClass: 'codicon codicon-settings' }
+    { id: 'clear', label: 'Clear terminal', action: () => this.clearTerminal(), iconName: 'clear-all', shortcut: 'Ctrl + L' },
+    { id: 'wordwrap', label: 'Toggle Word Wrap', action: () => this.toggleWordWrap(), iconName: 'word-wrap' },
+    { id: 'logs', label: 'Download Logs', action: () => this.downloadLogs(), iconName: 'cloud-download' },
+    { id: 'settings', label: 'Go to Settings', action: () => this.setView('setup'), iconName: 'settings' }
   ];
 
   toggleCommandPalette() {
@@ -703,7 +703,14 @@ export class PtyApp extends LitElement {
       url = this.wsBridgeUrl.trim();
     } else {
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      if (location.protocol === 'file:') {
+      const isLocalHost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      const isCordovaOrCapacitor = typeof (window as any).cordova !== 'undefined' || 
+                                   location.protocol === 'file:' || 
+                                   location.protocol.startsWith('capacitor') || 
+                                   location.protocol.startsWith('app') || 
+                                   location.origin.includes('localhost');
+
+      if (isLocalHost || isCordovaOrCapacitor) {
         url = 'ws://127.0.0.1:3000';
       } else {
         url = `${proto}//${location.host}`;
@@ -1210,7 +1217,7 @@ export class PtyApp extends LitElement {
     navigator.clipboard.writeText(text).then(() => {
       const btn = event.currentTarget as HTMLElement;
       const originalHtml = btn.innerHTML;
-      btn.innerHTML = '<span class="codicon codicon-check" style="color: #4caf50; font-size: 11px;"></span> Copied!';
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; color: #4caf50; margin-right: 4px;"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg> Copied!';
       btn.style.borderColor = '#4caf50';
       btn.style.color = '#4caf50';
       setTimeout(() => {
@@ -1221,6 +1228,111 @@ export class PtyApp extends LitElement {
     }).catch(() => {
       // Fallback
     });
+  }
+
+  renderHeroicon(name: string, extraStyle: string = '', size: number = 18) {
+    let d = '';
+    let isCustom = false;
+    let customSvg = html``;
+
+    switch (name) {
+      case 'home':
+        d = 'm2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25';
+        break;
+      case 'settings':
+      case 'settings-gear':
+        customSvg = html`
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: ${size}px; height: ${size}px; display: inline-block; vertical-align: middle; ${extraStyle}">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+          </svg>
+        `;
+        isCustom = true;
+        break;
+      case 'terminal':
+        d = 'M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5';
+        break;
+      case 'book':
+        d = 'M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18c-2.305 0-4.408.867-6 2.292m0-14.25v14.25';
+        break;
+      case 'copy':
+        d = 'M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.16-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75';
+        break;
+      case 'check':
+        d = 'm4.5 12.75 6 6 9-13.5';
+        break;
+      case 'chevron-down':
+        d = 'm19.5 8.25-7.5 7.5-7.5-7.5';
+        break;
+      case 'chevron-up':
+        d = 'm4.5 15.75 7.5-7.5 7.5 7.5';
+        break;
+      case 'bars':
+        d = 'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5';
+        break;
+      case 'arrows-up-down':
+        d = 'M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5';
+        break;
+      case 'arrow-up':
+        d = 'M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18';
+        break;
+      case 'arrow-down':
+        d = 'M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3';
+        break;
+      case 'arrow-left':
+        d = 'M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18';
+        break;
+      case 'arrow-right':
+        d = 'M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3';
+        break;
+      case 'indent':
+        d = 'M3.75 5.25h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5 4.5h11.25';
+        break;
+      case 'clear-all':
+        d = 'm14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0';
+        break;
+      case 'word-wrap':
+        d = 'M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3';
+        break;
+      case 'cloud-download':
+        d = 'M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3';
+        break;
+      case 'case-sensitive':
+        customSvg = html`
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: ${size}px; height: ${size}px; display: inline-block; vertical-align: middle; ${extraStyle}">
+            <text x="3" y="17" font-family="'Lato', sans-serif" font-size="16" font-weight="bold" fill="currentColor">Aa</text>
+          </svg>
+        `;
+        isCustom = true;
+        break;
+      case 'whole-word':
+        customSvg = html`
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: ${size}px; height: ${size}px; display: inline-block; vertical-align: middle; ${extraStyle}">
+            <text x="1" y="17" font-family="'Lato', sans-serif" font-size="15" font-weight="bold" fill="currentColor">"w"</text>
+          </svg>
+        `;
+        isCustom = true;
+        break;
+      case 'regex':
+        customSvg = html`
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: ${size}px; height: ${size}px; display: inline-block; vertical-align: middle; ${extraStyle}">
+            <text x="3" y="18" font-family="monospace" font-size="18" font-weight="bold" fill="currentColor">.*</text>
+          </svg>
+        `;
+        isCustom = true;
+        break;
+      default:
+        d = 'm2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12';
+        break;
+    }
+
+    if (isCustom) return customSvg;
+
+    return html`
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: ${size}px; height: ${size}px; display: inline-block; vertical-align: middle; ${extraStyle}">
+        <path stroke-linecap="round" stroke-linejoin="round" d="${d}" />
+      </svg>
+    `;
   }
 
   async saveMacros() {
@@ -1874,25 +1986,25 @@ export class PtyApp extends LitElement {
         <div class="activity-bar">
           <div class="tab ${this.activeTab === 'welcome' ? 'active' : ''}" @click="${() => this.setView('welcome')}">
             <div class="tab-icon-container">
-              <span class="codicon codicon-home"></span>
+              ${this.renderHeroicon('home', '', 18)}
             </div>
             <span class="tab-label">Welcome</span>
           </div>
           <div class="tab ${this.activeTab === 'setup' ? 'active' : ''}" @click="${() => this.setView('setup')}">
             <div class="tab-icon-container">
-              <span class="codicon codicon-settings-gear"></span>
+              ${this.renderHeroicon('settings-gear', '', 18)}
             </div>
             <span class="tab-label">Config</span>
           </div>
           <div class="tab ${this.activeTab === 'terminal' ? 'active' : ''}" @click="${() => this.setView('terminal')}">
             <div class="tab-icon-container">
-              <span class="codicon codicon-terminal"></span>
+              ${this.renderHeroicon('terminal', '', 18)}
             </div>
             <span class="tab-label">Terminal</span>
           </div>
           <div class="tab ${this.activeTab === 'documentation' ? 'active' : ''}" @click="${() => this.setView('documentation')}">
             <div class="tab-icon-container">
-              <span class="codicon codicon-book"></span>
+              ${this.renderHeroicon('book', '', 18)}
             </div>
             <span class="tab-label">Documentation</span>
           </div>
@@ -2257,9 +2369,9 @@ export class PtyApp extends LitElement {
                     <p class="description" style="margin-bottom: 8px;">Termux অ্যাপ ওপেন করে নিচের কমান্ডটি রান করুন (এটি NodeJS, OpenSSH এবং Git অটো-ইন্সটল করবে):</p>
                     <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
                       <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
-                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <span style="color: #a0a0a0;">${this.renderHeroicon('terminal', 'margin-right: 4px; vertical-align: middle;', 12)} Terminal</span>
                         <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('pkg update && pkg install -y nodejs openssh git', e)}">
-                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                          ${this.renderHeroicon('copy', 'margin-right: 4px; vertical-align: middle;', 11)} Copy
                         </button>
                       </div>
                       <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">pkg update && pkg install -y nodejs openssh git</code>
@@ -2274,9 +2386,9 @@ export class PtyApp extends LitElement {
                     <p class="description" style="margin-bottom: 8px;">টার্মিনালে প্রবেশাধিকারের জন্য একটি সিকিউর পাসওয়ার্ড তৈরি করুন:</p>
                     <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
                       <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
-                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <span style="color: #a0a0a0;">${this.renderHeroicon('terminal', 'margin-right: 4px; vertical-align: middle;', 12)} Terminal</span>
                         <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('passwd', e)}">
-                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                          ${this.renderHeroicon('copy', 'margin-right: 4px; vertical-align: middle;', 11)} Copy
                         </button>
                       </div>
                       <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">passwd</code>
@@ -2285,9 +2397,9 @@ export class PtyApp extends LitElement {
                     <p class="description" style="margin-top: 8px; margin-bottom: 8px;">আপনার বর্তমান Termux ইউজারনেমটি জানতে নিচের কমান্ডটি রান করুন:</p>
                     <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
                       <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
-                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <span style="color: #a0a0a0;">${this.renderHeroicon('terminal', 'margin-right: 4px; vertical-align: middle;', 12)} Terminal</span>
                         <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('whoami', e)}">
-                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                          ${this.renderHeroicon('copy', 'margin-right: 4px; vertical-align: middle;', 11)} Copy
                         </button>
                       </div>
                       <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">whoami</code>
@@ -2302,9 +2414,9 @@ export class PtyApp extends LitElement {
                     <p class="description" style="margin-bottom: 8px;">আপনার গিটহাব রিপোজিটরি ক্লোন করুন এবং অপ্টিমাইজড সেটআপ স্ক্রিপ্টটি চালু করুন যা দ্রুত মেমোরি ও ডেটা সেভ করে ইন্সটলেশন সম্পন্ন করবে:</p>
                     <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
                       <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
-                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <span style="color: #a0a0a0;">${this.renderHeroicon('terminal', 'margin-right: 4px; vertical-align: middle;', 12)} Terminal</span>
                         <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('git clone <your-repo-url>\ncd <repo-folder>\nchmod +x setup.sh && ./setup.sh', e)}">
-                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                          ${this.renderHeroicon('copy', 'margin-right: 4px; vertical-align: middle;', 11)} Copy
                         </button>
                       </div>
                       <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">git clone &lt;your-repo-url&gt;<br>cd &lt;repo-folder&gt;<br>chmod +x setup.sh && ./setup.sh</code>
@@ -2319,9 +2431,9 @@ export class PtyApp extends LitElement {
                     <p class="description" style="margin-bottom: 8px;">টার্মিনাল ব্রিজ ও কানেকশন অন করতে নিচের দুটি কমান্ড রান করুন:</p>
                     <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
                       <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
-                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <span style="color: #a0a0a0;">${this.renderHeroicon('terminal', 'margin-right: 4px; vertical-align: middle;', 12)} Terminal</span>
                         <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('sshd\nnode server.js', e)}">
-                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                          ${this.renderHeroicon('copy', 'margin-right: 4px; vertical-align: middle;', 11)} Copy
                         </button>
                       </div>
                       <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">sshd<br>node server.js</code>
@@ -2358,9 +2470,9 @@ export class PtyApp extends LitElement {
                     <p class="description" style="margin-bottom: 8px;">Open Termux and execute the following command to download NodeJS, OpenSSH, and Git:</p>
                     <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
                       <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
-                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <span style="color: #a0a0a0;">${this.renderHeroicon('terminal', 'margin-right: 4px; vertical-align: middle;', 12)} Terminal</span>
                         <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('pkg update && pkg install -y nodejs openssh git', e)}">
-                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                          ${this.renderHeroicon('copy', 'margin-right: 4px; vertical-align: middle;', 11)} Copy
                         </button>
                       </div>
                       <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">pkg update && pkg install -y nodejs openssh git</code>
@@ -2375,9 +2487,9 @@ export class PtyApp extends LitElement {
                     <p class="description" style="margin-bottom: 8px;">Create a secure connection password for terminal authentication:</p>
                     <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
                       <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
-                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <span style="color: #a0a0a0;">${this.renderHeroicon('terminal', 'margin-right: 4px; vertical-align: middle;', 12)} Terminal</span>
                         <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('passwd', e)}">
-                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                          ${this.renderHeroicon('copy', 'margin-right: 4px; vertical-align: middle;', 11)} Copy
                         </button>
                       </div>
                       <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">passwd</code>
@@ -2386,9 +2498,9 @@ export class PtyApp extends LitElement {
                     <p class="description" style="margin-top: 8px; margin-bottom: 8px;">Retrieve your active Termux username needed in connection configuration:</p>
                     <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
                       <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
-                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <span style="color: #a0a0a0;">${this.renderHeroicon('terminal', 'margin-right: 4px; vertical-align: middle;', 12)} Terminal</span>
                         <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('whoami', e)}">
-                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                          ${this.renderHeroicon('copy', 'margin-right: 4px; vertical-align: middle;', 11)} Copy
                         </button>
                       </div>
                       <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">whoami</code>
@@ -2403,9 +2515,9 @@ export class PtyApp extends LitElement {
                     <p class="description" style="margin-bottom: 8px;">Clone your repository and run our lightweight installer which minimizes bandwidth and resource consumption:</p>
                     <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
                       <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
-                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <span style="color: #a0a0a0;">${this.renderHeroicon('terminal', 'margin-right: 4px; vertical-align: middle;', 12)} Terminal</span>
                         <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('git clone <your-repo-url>\ncd <repo-folder>\nchmod +x setup.sh && ./setup.sh', e)}">
-                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                          ${this.renderHeroicon('copy', 'margin-right: 4px; vertical-align: middle;', 11)} Copy
                         </button>
                       </div>
                       <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">git clone &lt;your-repo-url&gt;<br>cd &lt;repo-folder&gt;<br>chmod +x setup.sh && ./setup.sh</code>
@@ -2420,9 +2532,9 @@ export class PtyApp extends LitElement {
                     <p class="description" style="margin-bottom: 8px;">Spin up the server instances using the commands below:</p>
                     <div style="position: relative; margin-bottom: 12px; border: 1px solid #303030; border-radius: 4px; overflow: hidden; background: #181818; max-width: 100%;">
                       <div style="display: flex; justify-content: space-between; align-items: center; background: #252526; padding: 4px 12px; border-bottom: 1px solid #303030; font-size: 11px; font-family: 'Lato', sans-serif;">
-                        <span style="color: #a0a0a0;"><span class="codicon codicon-terminal" style="font-size: 12px; vertical-align: middle;"></span> Terminal</span>
+                        <span style="color: #a0a0a0;">${this.renderHeroicon('terminal', 'margin-right: 4px; vertical-align: middle;', 12)} Terminal</span>
                         <button style="background: none; border: 1px solid rgba(255,255,255,0.15); color: #ccc; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Lato', sans-serif; transition: all 0.1s;" @click="${(e: Event) => this.copyCommandText('sshd\nnode server.js', e)}">
-                          <span class="codicon codicon-copy" style="font-size: 11px;"></span> Copy
+                          ${this.renderHeroicon('copy', 'margin-right: 4px; vertical-align: middle;', 11)} Copy
                         </button>
                       </div>
                       <code style="display: block; padding: 10px 12px; color: #9cdcfe; font-family: monospace; font-size: 12px; border: none; border-radius: 0; background: transparent; margin: 0; overflow-x: auto; white-space: pre;">sshd<br>node server.js</code>
@@ -2594,13 +2706,13 @@ export class PtyApp extends LitElement {
               <input type="text" id="search-input" placeholder="Find" .value="${this.searchValue}" @input="${this.onSearchInput}" @keydown="${this.onSearchKeyDown}">
               <div class="search-options">
                 <button class="search-opt-btn ${this.searchCaseSensitive ? 'active' : ''}" @click="${this.toggleSearchCaseSensitive}" title="Match Case">
-                  <span class="codicon codicon-case-sensitive"></span>
+                  ${this.renderHeroicon('case-sensitive', '', 14)}
                 </button>
                 <button class="search-opt-btn ${this.searchWholeWord ? 'active' : ''}" @click="${this.toggleSearchWholeWord}" title="Match Whole Word">
-                  <span class="codicon codicon-whole-word"></span>
+                  ${this.renderHeroicon('whole-word', '', 14)}
                 </button>
                 <button class="search-opt-btn ${this.searchRegex ? 'active' : ''}" @click="${this.toggleSearchRegex}" title="Use Regular Expression">
-                  <span class="codicon codicon-regex"></span>
+                  ${this.renderHeroicon('regex', '', 14)}
                 </button>
               </div>
             </div>
@@ -2611,14 +2723,14 @@ export class PtyApp extends LitElement {
           <div id="terminal"></div>
           ${this.showScrollToBottom ? html`
             <button class="scroll-to-bottom-btn" @click="${this.scrollToBottom}">
-              <span class="codicon codicon-chevron-down"></span> Scroll to bottom
+              ${this.renderHeroicon('chevron-down', 'margin-right: 4px; vertical-align: middle;', 14)} Scroll to bottom
             </button>
           ` : ''}
 
         </div>
         
         <button class="toolbar-toggle-btn" @click="${() => this.toolbarVisible = !this.toolbarVisible}" title="${this.toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}">
-          <span class="codicon ${this.toolbarVisible ? 'codicon-chevron-down' : 'codicon-chevron-up'}"></span>
+          ${this.renderHeroicon(this.toolbarVisible ? 'chevron-down' : 'chevron-up', '', 16)}
         </button>
 
         <div class="vs-toolbar" style="display: ${this.toolbarVisible ? 'flex' : 'none'}">
@@ -2643,22 +2755,22 @@ export class PtyApp extends LitElement {
           <!-- Row 1 -->
           <div class="toolbar-row">
             <button class="key" @click="${() => this.sendToolbarKey('ESC')}">ESC</button>
-            <button class="key" id="menu-btn" @click="${this.togglePalette}"><i class="fa-solid fa-bars"></i></button>
-            <button class="key" @click="${() => this.toolbarVisible = !this.toolbarVisible}"><i class="fa-solid fa-arrows-up-down"></i></button>
+            <button class="key" id="menu-btn" @click="${this.togglePalette}">${this.renderHeroicon('bars', '', 14)}</button>
+            <button class="key" @click="${() => this.toolbarVisible = !this.toolbarVisible}">${this.renderHeroicon('arrows-up-down', '', 14)}</button>
             <button class="key" @click="${() => this.sendToolbarKey('HOME')}">HOME</button>
-            <button class="key" @click="${() => this.sendToolbarKey('UP')}"><i class="fa-solid fa-arrow-up"></i></button>
+            <button class="key" @click="${() => this.sendToolbarKey('UP')}">${this.renderHeroicon('arrow-up', '', 14)}</button>
             <button class="key" @click="${() => this.sendToolbarKey('END')}">END</button>
             <button class="key" @click="${() => this.sendCmd('\x1b[5~')}">PGUP</button>
           </div>
 
           <!-- Row 2 -->
           <div class="toolbar-row">
-            <button class="key" @click="${() => this.sendToolbarKey('TAB')}"><i class="fa-solid fa-indent"></i></button>
+            <button class="key" @click="${() => this.sendToolbarKey('TAB')}">${this.renderHeroicon('indent', '', 14)}</button>
             <button class="key ${this.ctrlActive ? 'active' : ''}" @click="${() => this.ctrlActive = !this.ctrlActive}">CTRL</button>
             <button class="key ${this.altActive ? 'active' : ''}" @click="${() => this.altActive = !this.altActive}">ALT</button>
-            <button class="key" @click="${() => this.sendToolbarKey('LEFT')}"><i class="fa-solid fa-arrow-left"></i></button>
-            <button class="key" @click="${() => this.sendToolbarKey('DOWN')}"><i class="fa-solid fa-arrow-down"></i></button>
-            <button class="key" @click="${() => this.sendToolbarKey('RIGHT')}"><i class="fa-solid fa-arrow-right"></i></button>
+            <button class="key" @click="${() => this.sendToolbarKey('LEFT')}">${this.renderHeroicon('arrow-left', '', 14)}</button>
+            <button class="key" @click="${() => this.sendToolbarKey('DOWN')}">${this.renderHeroicon('arrow-down', '', 14)}</button>
+            <button class="key" @click="${() => this.sendToolbarKey('RIGHT')}">${this.renderHeroicon('arrow-right', '', 14)}</button>
             <button class="key" @click="${() => this.sendCmd('\x1b[6~')}">PGDN</button>
           </div>
         </div>
@@ -2676,8 +2788,8 @@ export class PtyApp extends LitElement {
                 <li class="palette-group">Recent</li>
                 ${this.recentCommandIds.map(id => this.commands.find(c => c.id === id)).filter(c => c && c.label.toLowerCase().includes(this.commandQuery.toLowerCase())).map(c => html`
                   <li class="palette-item" @click="${() => this.executeCommand(c)}">
-                    <span class="${c.iconClass}"></span> <span class="palette-label">${c.label}</span>
-                    ${c.shortcut ? html`<span class="shortcut">${c.shortcut}</span>` : ''}
+                    ${c ? this.renderHeroicon(c.iconName, 'margin-right: 8px;', 16) : ''} <span class="palette-label">${c ? c.label : ''}</span>
+                    ${c && c.shortcut ? html`<span class="shortcut">${c.shortcut}</span>` : ''}
                   </li>
                 `)}
               <li class="palette-divider"></li>
@@ -2685,7 +2797,7 @@ export class PtyApp extends LitElement {
             ` : ''}
             ${this.commands.filter(c => c.label.toLowerCase().includes(this.commandQuery.toLowerCase())).map(c => html`
               <li class="palette-item" @click="${() => this.executeCommand(c)}">
-                <span class="${c.iconClass}"></span> <span class="palette-label">${c.label}</span>
+                ${this.renderHeroicon(c.iconName, 'margin-right: 8px;', 16)} <span class="palette-label">${c.label}</span>
                 ${c.shortcut ? html`<span class="shortcut">${c.shortcut}</span>` : ''}
               </li>
               ${c.id === 'settings' ? html`<li class="palette-divider"></li>` : ''}
