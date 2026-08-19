@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<widget id="com.ssh.pty.terminal" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+<widget id="com.ssh.pty.terminal" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0" xmlns:android="http://schemas.android.com/apk/res/android">
     <name>PTY Terminal</name>
     <description>
         PTY terminal for Android
@@ -20,5 +20,9 @@
         <icon src="www/app-icon.png" />
         <preference name="AndroidWindowSplashScreenAnimatedIcon" value="www/splash-icon.png" />
         <preference name="AndroidWindowSplashScreenBackground" value="#1E1E1E" />
+        <preference name="android-usesCleartextTraffic" value="true" />
+        <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application">
+            <application android:usesCleartextTraffic="true" />
+        </edit-config>
     </platform>
 </widget>
